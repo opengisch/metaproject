@@ -363,7 +363,7 @@ $BODY$
 			_child_table := _parent_table->'inherited_by'->_child_table_name;
 			_sql_cmd := _sql_cmd || format('
 				DELETE FROM %1$s WHERE %2$I = OLD.%2$I;
-				)'
+				'
 				, (_child_table->>'table_name')::regclass --1
 				, (_child_table->>'pkey')::text --2
 			);
@@ -373,6 +373,7 @@ $BODY$
 			, (_parent_table->>'table_name')::regclass --1
 			, (_parent_table->>'pkey')::text --2
 		);
+		EXECUTE _sql_cmd;
 
 	END;
 $BODY$
