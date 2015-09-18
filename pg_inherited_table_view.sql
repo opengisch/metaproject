@@ -1,27 +1,39 @@
 /*
 	pg_inherited_table_view
-	
+
 	Denis Rouzaud
 	18.09.2015
 */
 
-CREATE OR REPLACE FUNCTION :SCHEMA.fn_inherited_table_view(_parent_table json, _children_tables json[], _destination_schema text) RETURNS void AS
+CREATE OR REPLACE FUNCTION :SCHEMA.fn_inherited_table_view(_definition json) RETURNS void AS
 $BODY$
 	DECLARE
+		_parent_table_name text;
+		_child_table_name text;
+		_parent_table json;
+		_child_table json;
 		_parent_field_array text[];
 		_child_field_array text[];
 		_parent_field_list text;
 		_child_field_list text;
+
 		_view_rootname text;
 		_view_name text;
 		_function_trigger text;
-		_child_table json;
 		_merge_view_name text;
-		_sql_cmd text;
 		_merge_delete_cmd text;
 		_merge_view_rootname text;
 		_additional_column text;
+		_sql_cmd text;
+		_destination_schema text;
 	BEGIN
+		-- there must be only one parent table given (i.e. only 1 entry on the top level of _definition)
+		_parent_table_name := json_object_keys(_definition);
+		RAISE NOTICE 'generates view for %' , _parent_table_name;
+		_parent_table := _definition->_parent_table_name;
+
+		_destination_schema := _parent_table->'merge_view'->>'destination_schema';
+
 		-- get array of fields for parent table
 		EXECUTE format(	$$ SELECT ARRAY( SELECT attname FROM pg_attribute WHERE attrelid = %1$L::regclass AND attnum > 0 ORDER BY attnum ASC ) $$, _parent_table->>'table_name') INTO _parent_field_array;
 		_parent_field_array := array_remove(_parent_field_array, (_parent_table->>'pkey')::text ); -- remove pkey from field list
@@ -33,13 +45,14 @@ $BODY$
 			INTO _parent_field_list;
 
   		-- create view and triggers/rules for 1:1 joined view
-  		FOREACH _child_table IN ARRAY _children_tables LOOP
-			RAISE NOTICE 'edit view for %', _child_table->>'readable';
+  		FOR _child_table_name IN SELECT json_object_keys(_parent_table->'inherited_by') LOOP
+			_child_table := _parent_table->'inherited_by'->_child_table_name;
+			RAISE NOTICE 'edit view for %', _child_table_name;
 
 			-- define view name
-			_view_rootname := 'vw_'||(_parent_table->>'readable')||'_'||(_child_table->>'readable');
+			_view_rootname := 'vw_'||_parent_table_name||'_'||_child_table_name;
 			_view_name := _destination_schema||'.'||_view_rootname;
-			_function_trigger := _destination_schema||'.ft_'||(_parent_table->>'readable')||'_'||(_child_table->>'readable')||'_insert';
+			_function_trigger := _destination_schema||'.ft_'||_parent_table_name||'_'||_child_table_name||'_insert';
 
 			-- get array of fields for child table
 			EXECUTE format(	$$ SELECT ARRAY( SELECT attname FROM pg_attribute WHERE attrelid = %1$L::regclass AND attnum > 0 ORDER BY attnum ASC ) $$, _child_table->>'table_name') INTO _child_field_array;
@@ -51,12 +64,12 @@ $BODY$
 					SELECT %6$I.%8$I, %2$s, %3$s
 				FROM %5$s %7$I INNER JOIN %4$s %6$I ON %6$I.%8$I = %7$I.%9$I;'
 				, _view_name --1
-				, (_parent_table->>'readable')::text ||'.' || array_to_string(_parent_field_array, ', '||(_parent_table->>'readable')::text||'.') --2
-				, (_child_table->>'readable')::text  ||'.' || array_to_string(_child_field_array,  ', '||(_child_table->>'readable')::text ||'.') --3
+				, _parent_table_name ||'.' || array_to_string(_parent_field_array, ', '||_parent_table_name||'.') --2
+				, _child_table_name  ||'.' || array_to_string(_child_field_array,  ', '||_child_table_name ||'.') --3
 				, (_parent_table->>'table_name')::regclass --4
 				, (_child_table->>'table_name')::regclass --5
-				, _parent_table->>'readable' --6
-				, _child_table->>'readable' --7
+				, _parent_table_name --6
+				, _child_table_name --7
 				, _parent_table->>'pkey' --8
 				, _child_table->>'pkey' --9
 			);
@@ -98,8 +111,8 @@ $BODY$
 				_view_name::regclass, --2
 				_function_trigger::regproc --3
 			);
-			
-			
+
+
 			-- update rule
 			RAISE NOTICE '  update rule';
 			SELECT array_to_string(f, ', ') -- create command of update rule for parent fiels
@@ -140,32 +153,38 @@ $BODY$
 		END LOOP;
 
 
-		
+		-- create enum
+		_sql_cmd := format('CREATE TYPE ws_%s_type AS ENUM (', _parent_table_name );
+		FOR _child_table_name IN SELECT json_object_keys(_parent_table->'inherited_by') LOOP
+			_child_table := _parent_table->'inherited_by'->_child_table_name;
+			_sql_cmd := _sql_cmd || format('');
+		END LOOP;
 
 		-- merge view (all children tables)
 		_merge_view_rootname := _parent_table->'merge_view'->>'view_name';
 		IF _merge_view_rootname IS NULL THEN
-			_merge_view_rootname := format( 'vw_%I_merge', _parent_table->>'readable' );
+			_merge_view_rootname := format( 'vw_%I_merge', _parent_table_name );
 		END IF;
 		_merge_view_name := _destination_schema||'.'||_merge_view_rootname;
 		-- create view and use first column to define type of inherited table
 		_sql_cmd := format('CREATE OR REPLACE VIEW %s AS SELECT CASE ', _merge_view_name); -- create field to determine inherited table
-		
-		FOREACH _child_table IN ARRAY _children_tables LOOP
+
+		FOR _child_table_name IN SELECT json_object_keys(_parent_table->'inherited_by') LOOP
+			_child_table := _parent_table->'inherited_by'->_child_table_name;
 			_sql_cmd := _sql_cmd || format('
 				WHEN %1$I.%2$I IS NOT NULL THEN %1$L::text '
-				, _child_table->>'readable' --1
+				, _child_table_name --1
 				, (_child_table->>'pkey')::text --2
 			);
 		END LOOP;
 		_sql_cmd := _sql_cmd || format(' ELSE ''unknown''::text END AS %1$s_type'
-			, _parent_table->>'readable' --1
+			, _parent_table_name --1
 		);
 		-- add parent table columns
 		_sql_cmd := _sql_cmd || format(', %1$I.%2$I, %3$s '
-			, _parent_table->>'readable' --1
+			, _parent_table_name --1
 			, (_parent_table->>'pkey')::text --2
-			, (_parent_table->>'readable')::text || '.' || array_to_string(_parent_field_array, ', ' || (_parent_table->>'readable')::text || '.') --3
+			, _parent_table_name || '.' || array_to_string(_parent_field_array, ', ' || _parent_table_name || '.') --3
 		);
 		-- additional columns if they exists
 		FOR _additional_column IN SELECT json_object_keys(_parent_table->'merge_view'->'additional_columns') LOOP
@@ -175,24 +194,26 @@ $BODY$
 			);
 		END LOOP;
 		-- add columns of children tables
-		FOREACH _child_table IN ARRAY _children_tables LOOP
+		FOR _child_table_name IN SELECT json_object_keys(_parent_table->'inherited_by') LOOP
+			_child_table := _parent_table->'inherited_by'->_child_table_name;
 			EXECUTE format(	$$ SELECT ARRAY( SELECT attname FROM pg_attribute WHERE attrelid = %1$L::regclass AND attnum > 0 ORDER BY attnum ASC ) $$, _child_table->>'table_name') INTO _child_field_array;
 			_child_field_array := array_remove(_child_field_array, (_child_table->>'pkey')::text); -- remove pkey from field list
-			_sql_cmd := _sql_cmd || ', ' || (_child_table->>'readable')::text || '.' || array_to_string(_child_field_array, ', '||(_child_table->>'readable')::text||'.');
+			_sql_cmd := _sql_cmd || ', ' || _child_table_name || '.' || array_to_string(_child_field_array, ', '||_child_table_name||'.');
 		END LOOP;
 		-- from parent table
-		_sql_cmd := _sql_cmd || format(' 
+		_sql_cmd := _sql_cmd || format('
 			FROM %1$s %2$I'
 			, (_parent_table->>'table_name')::regclass
-			, (_parent_table->>'readable')::text
+			, _parent_table_name
 		);
 		-- from children tables (LEFT JOIN)
-		FOREACH _child_table IN ARRAY _children_tables LOOP
+		FOR _child_table_name IN SELECT json_object_keys(_parent_table->'inherited_by') LOOP
+			_child_table := _parent_table->'inherited_by'->_child_table_name;
 			_sql_cmd := _sql_cmd || format('
 				LEFT JOIN %1$s %2$I ON %3$I.%4$I = %2$s.%5$I '
-				, (_child_table->>'table_name')::regclass --1 
-				, _child_table->>'readable' --2
-				, _parent_table->>'readable' --3
+				, (_child_table->>'table_name')::regclass --1
+				, _child_table_name --2
+				, _parent_table_name --3
 				, (_parent_table->>'pkey')::text --4
 				, (_child_table->>'pkey')::text --5
 			);
@@ -217,13 +238,14 @@ $BODY$
 			, _parent_table->>'pkey_nextval' --5
 			, 'NEW.'||array_to_string(_parent_field_array, ', NEW.') --6
 		);
-		FOREACH _child_table IN ARRAY _children_tables LOOP
+		FOR _child_table_name IN SELECT json_object_keys(_parent_table->'inherited_by') LOOP
+			_child_table := _parent_table->'inherited_by'->_child_table_name;
 			EXECUTE format(	$$ SELECT ARRAY( SELECT attname FROM pg_attribute WHERE attrelid = %1$L::regclass AND attnum > 0 ORDER BY attnum ASC ) $$, _child_table->>'table_name') INTO _child_field_array;
 			_child_field_array := array_remove(_child_field_array, (_child_table->>'pkey')::text); -- remove pkey from field list
 			_sql_cmd := _sql_cmd || format('
 				WHEN NEW.%1$I = %2$L THEN INSERT INTO %3$s ( %4$I, %5$s )VALUES (NEW.%6$I, %7$s );'
-				, (_parent_table->>'readable') || '_type' --1
-				, _child_table->>'readable'::text --2
+				, _parent_table_name || '_type' --1
+				, _child_table_name::text --2
 				, (_child_table->>'table_name')::regclass --3
 				, (_child_table->>'pkey')::text --4
 				, array_to_string(_child_field_array, ', ') --5
@@ -262,13 +284,14 @@ $BODY$
 			, (_parent_table->>'table_name')::regclass --2
 			, _parent_field_list --3
 			, (_parent_table->>'pkey')::text --4
-			, (_parent_table->>'readable') || '_type' --5
+			, _parent_table_name || '_type' --5
 		);
-		FOREACH _child_table IN ARRAY _children_tables LOOP
+		FOR _child_table_name IN SELECT json_object_keys(_parent_table->'inherited_by') LOOP
+			_child_table := _parent_table->'inherited_by'->_child_table_name;
 			_sql_cmd := _sql_cmd || format('
 				WHEN OLD.%1$I = %2$L THEN DELETE FROM %3$s WHERE %4$I = OLD.%4$I;'
-				, (_parent_table->>'readable') || '_type' --1
-				, _child_table->>'readable'::text --2
+				, _parent_table_name || '_type' --1
+				, _child_table_name::text --2
 				, (_child_table->>'table_name')::regclass --3
 				, (_child_table->>'pkey')::text --3
 			);
@@ -276,11 +299,12 @@ $BODY$
 		_sql_cmd := _sql_cmd || '
 			END CASE;
 			CASE';
-		FOREACH _child_table IN ARRAY _children_tables LOOP
+		FOR _child_table_name IN SELECT json_object_keys(_parent_table->'inherited_by') LOOP
+			_child_table := _parent_table->'inherited_by'->_child_table_name;
 			_sql_cmd := _sql_cmd || format('
 				WHEN NEW.%1$I = %2$L THEN INSERT INTO %3$s (%4$I) VALUES (OLD.%5$I);'
-				, (_parent_table->>'readable') || '_type' --1
-				, _child_table->>'readable'::text --2
+				, _parent_table_name || '_type' --1
+				, _child_table_name::text --2
 				, (_child_table->>'table_name')::regclass --3
 				, (_child_table->>'pkey')::text --4
 				, (_parent_table->>'pkey')::text --5
@@ -290,7 +314,8 @@ $BODY$
 			END CASE;
 			END IF;
 			CASE ';
-		FOREACH _child_table IN ARRAY _children_tables LOOP
+		FOR _child_table_name IN SELECT json_object_keys(_parent_table->'inherited_by') LOOP
+			_child_table := _parent_table->'inherited_by'->_child_table_name;
 			-- write list of fields for update command
 			EXECUTE format(	$$ SELECT ARRAY( SELECT attname FROM pg_attribute WHERE attrelid = %1$L::regclass AND attnum > 0 ORDER BY attnum ASC ) $$, _child_table->>'table_name') INTO _child_field_array;
 			_child_field_array := array_remove(_child_field_array, (_child_table->>'pkey')::text); -- remove pkey from field list
@@ -301,8 +326,8 @@ $BODY$
 
 			_sql_cmd := _sql_cmd || format('
 				WHEN NEW.%1$I = %2$L THEN UPDATE %3$s SET %4$s WHERE %5$I = OLD.%5$I;'
-				, (_parent_table->>'readable') || '_type' --1
-				, _child_table->>'readable'::text --2
+				, _parent_table_name || '_type' --1
+				, _child_table_name::text --2
 				, (_child_table->>'table_name')::regclass --3
 				, _child_field_list --4
 				, (_child_table->>'pkey')::text --5
@@ -325,8 +350,8 @@ $BODY$
 			_merge_view_name::regclass, --2
 			(_destination_schema||'.ft_'||_merge_view_rootname||'_update')::regproc --3
 		);
-		
-		
+
+
 
 		-- delete function trigger for merge view
 		_sql_cmd := format('
@@ -334,7 +359,8 @@ $BODY$
 			'rl_'||_merge_view_rootname||'_delete', --1
 			_merge_view_name::regclass --2
 		);
-		FOREACH _child_table IN ARRAY _children_tables LOOP
+		FOR _child_table_name IN SELECT json_object_keys(_parent_table->'inherited_by') LOOP
+			_child_table := _parent_table->'inherited_by'->_child_table_name;
 			_sql_cmd := _sql_cmd || format('
 				DELETE FROM %1$s WHERE %2$I = OLD.%2$I;
 				)'
