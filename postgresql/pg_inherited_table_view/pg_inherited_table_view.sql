@@ -16,9 +16,11 @@ $BODY$
 		_child_field_array text[];
 		_parent_field_list text;
 		_child_field_list text;
+		_child_remap_array json;
 
 		_view_rootname text;
 		_view_name text;
+		_column text;
 		_function_trigger text;
 		_merge_view_name text;
 		_merge_delete_cmd text;
@@ -212,7 +214,16 @@ $BODY$
 			EXECUTE format(	$$ SELECT ARRAY( SELECT attname FROM pg_attribute WHERE attrelid = %1$L::regclass AND attnum > 0 ORDER BY attnum ASC ) $$, _child_table->>'table_name') INTO _child_field_array;
 			_child_field_array := array_remove(_child_field_array, (_child_table->>'pkey')::text); -- remove pkey from field list
 			CONTINUE WHEN array_length(_child_field_array, 1) IS NULL; -- do not update if no additional fields in the child table
-			_sql_cmd := _sql_cmd || ', ' || _child_table_name || '.' || array_to_string(_child_field_array, ', '||_child_table_name||'.');
+			
+			_child_remap_array := json_object_keys(_child_table->'remap');
+			RAISE NOTICE '%', _child_remap_array;
+			FOREACH _column IN ARRAY _child_field_array LOOP
+				RAISE NOTICE '%', _column;
+				_sql_cmd := _sql_cmd || format(', %1$I.%2$I', _child_table_name, _column);
+				IF _column = ANY(_child_remap_array) THEN
+					_sql_cmd := _sql_cmd || format( ' AS %$L', _child_table->'remap'->>_column );
+				END IF;
+			END LOOP; 
 		END LOOP;
 		-- from parent table
 		_sql_cmd := _sql_cmd || format('
