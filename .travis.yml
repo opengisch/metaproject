@@ -9,6 +9,6 @@ addons:
 before_script: 
   - printf "[pg_test]\nhost=localhost\ndbname=pg_test\nuser=postgres" > ~/.pg_service.conf
   - psql -c 'CREATE DATABASE pg_test;' -U postgres
-  - psql -v SCHEMA=public -f $TRAVIS_BUILD_DIR/postgresql/pg_inherited_table_view/pg_inherited_table_view.sql
+  - psql -v ON_ERROR_STOP=on -v SCHEMA=public -f $TRAVIS_BUILD_DIR/postgresql/pg_inherited_table_view/pg_inherited_table_view.sql
   
-script: PGSERVICE=pg_test; psql -f $TRAVIS_BUILD_DIR/postgresql/pg_inherited_table_view/demo.sql
+script: PGSERVICE=pg_test; psql -v ON_ERROR_STOP=on -f $TRAVIS_BUILD_DIR/postgresql/pg_inherited_table_view/demo.sql
