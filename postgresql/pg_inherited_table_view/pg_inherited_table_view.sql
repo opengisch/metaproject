@@ -14,9 +14,10 @@ $BODY$
 		_child_table json;
 		_parent_field_array text[];
 		_child_field_array text[];
+		_child_field_remapped_array text[];
 		_parent_field_list text;
 		_child_field_list text;
-		_child_remap_array json;
+		_child_remap_array text[];
 
 		_view_rootname text;
 		_view_name text;
@@ -213,17 +214,13 @@ $BODY$
 			_child_table := _parent_table->'inherited_by'->_child_table_name;
 			EXECUTE format(	$$ SELECT ARRAY( SELECT attname FROM pg_attribute WHERE attrelid = %1$L::regclass AND attnum > 0 ORDER BY attnum ASC ) $$, _child_table->>'table_name') INTO _child_field_array;
 			_child_field_array := array_remove(_child_field_array, (_child_table->>'pkey')::text); -- remove pkey from field list
-			CONTINUE WHEN array_length(_child_field_array, 1) IS NULL; -- do not update if no additional fields in the child table
-			
-			_child_remap_array := json_object_keys(_child_table->'remap');
-			RAISE NOTICE '%', _child_remap_array;
+			_child_remap_array := ARRAY( SELECT json_object_keys(_child_table->'remap'));
 			FOREACH _column IN ARRAY _child_field_array LOOP
-				RAISE NOTICE '%', _column;
 				_sql_cmd := _sql_cmd || format(', %1$I.%2$I', _child_table_name, _column);
 				IF _column = ANY(_child_remap_array) THEN
-					_sql_cmd := _sql_cmd || format( ' AS %$L', _child_table->'remap'->>_column );
+					_sql_cmd := _sql_cmd || format( ' AS %I', _child_table->'remap'->>_column );
 				END IF;
-			END LOOP; 
+			END LOOP;
 		END LOOP;
 		-- from parent table
 		_sql_cmd := _sql_cmd || format('
@@ -267,15 +264,22 @@ $BODY$
 			_child_table := _parent_table->'inherited_by'->_child_table_name;
 			EXECUTE format(	$$ SELECT ARRAY( SELECT attname FROM pg_attribute WHERE attrelid = %1$L::regclass AND attnum > 0 ORDER BY attnum ASC ) $$, _child_table->>'table_name') INTO _child_field_array;
 			_child_field_array := array_remove(_child_field_array, (_child_table->>'pkey')::text); -- remove pkey from field list
+			-- create an array with the remapped columns (original columns if not remapped)
+			_child_field_remapped_array := _child_field_array;
+			FOREACH _column IN ARRAY ARRAY( SELECT json_object_keys(_child_table->'remap')) LOOP
+				_child_field_remapped_array = array_replace(_child_field_remapped_array,
+															_column,
+															_child_table->'remap'->>_column);
+			END LOOP;
 			_sql_cmd := _sql_cmd || format('
-				WHEN NEW.%1$I::%8$I.%1$I = %2$L THEN INSERT INTO %3$s ( %4$I %5$s )VALUES (NEW.%6$I %7$s );'
+				WHEN NEW.%1$I::%8$I.%1$I = %2$L THEN INSERT INTO %3$s ( %4$I %5$s ) VALUES (NEW.%6$I %7$s );'
 				, _parent_table_name || '_type' --1
 				, _child_table_name::text --2
 				, (_child_table->>'table_name')::regclass --3
 				, (_child_table->>'pkey')::text --4
 				, CASE WHEN array_length(_child_field_array, 1)>0 THEN  ', '||array_to_string(_child_field_array, ', ') ELSE '' END --5
 				, (_parent_table->>'pkey')::text --6
-				, CASE WHEN array_length(_child_field_array, 1)>0 THEN  ', NEW.'||array_to_string(_child_field_array, ', NEW.') ELSE '' END --7
+				, CASE WHEN array_length(_child_field_array, 1)>0 THEN  ', NEW.'||array_to_string(_child_field_remapped_array, ', NEW.') ELSE '' END --7
 				, _destination_schema --8
 			);
 		END LOOP;
@@ -316,7 +320,7 @@ $BODY$
 		END IF;
 		_sql_cmd := _sql_cmd || format('
 			/* Allow change type */
-			IF OLD.%1$I <> NEW.%1$I::%2$I.%1$I THEN CASE'	
+			IF OLD.%1$I <> NEW.%1$I::%2$I.%1$I THEN CASE'
 			, _parent_table_name || '_type' --1
 			, _destination_schema --2
 		);
@@ -356,8 +360,16 @@ $BODY$
 			EXECUTE format(	$$ SELECT ARRAY( SELECT attname FROM pg_attribute WHERE attrelid = %1$L::regclass AND attnum > 0 ORDER BY attnum ASC ) $$, _child_table->>'table_name') INTO _child_field_array;
 			_child_field_array := array_remove(_child_field_array, (_child_table->>'pkey')::text); -- remove pkey from field list
 			SELECT array_to_string(f, ', ') -- create command of update rule for parent fiels
-				FROM ( SELECT array_agg(f||' = NEW.'||f) AS f
-				FROM unnest(_child_field_array)     AS f ) foo
+				FROM ( 	SELECT array_agg(f||' = NEW.'||
+							CASE 
+								WHEN (_child_table->'remap'->>f)::text IS NOT NULL THEN
+									_child_table->'remap'->>f
+								ELSE
+									f
+								END							
+							) AS f
+						FROM unnest(_child_field_array) AS f
+					) foo
 				INTO _child_field_list;
 
 			_sql_cmd := _sql_cmd || format('
