@@ -102,6 +102,7 @@ $BODY$
 			-- insert trigger
 			RAISE NOTICE '  trigger';
 			EXECUTE format('
+				DROP TRIGGER IF EXISTS %1$I ON %2$s;
 				CREATE TRIGGER %1$I
 					  INSTEAD OF INSERT
 					  ON %2$s
@@ -265,6 +266,7 @@ $BODY$
 			LANGUAGE plpgsql;';
 		EXECUTE( _sql_cmd );
 		EXECUTE format('
+			DROP TRIGGER IF EXISTS %1$I ON %2$s;
 			CREATE TRIGGER %1$I
 				  INSTEAD OF INSERT
 				  ON %2$s
@@ -349,6 +351,7 @@ $BODY$
 			LANGUAGE plpgsql;';
 		EXECUTE( _sql_cmd );
 		EXECUTE format('
+			DROP TRIGGER IF EXISTS %1$I ON %2$s;
 			CREATE TRIGGER %1$I
 				  INSTEAD OF UPDATE
 				  ON %2$s
