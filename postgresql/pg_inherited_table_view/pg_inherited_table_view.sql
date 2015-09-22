@@ -17,7 +17,6 @@ $BODY$
 		_child_field_remapped_array text[];
 		_parent_field_list text;
 		_child_field_list text;
-		_child_remap_array text[];
 
 		_view_rootname text;
 		_view_name text;
@@ -214,10 +213,9 @@ $BODY$
 			_child_table := _parent_table->'inherited_by'->_child_table_name;
 			EXECUTE format(	$$ SELECT ARRAY( SELECT attname FROM pg_attribute WHERE attrelid = %1$L::regclass AND attnum > 0 ORDER BY attnum ASC ) $$, _child_table->>'table_name') INTO _child_field_array;
 			_child_field_array := array_remove(_child_field_array, (_child_table->>'pkey')::text); -- remove pkey from field list
-			_child_remap_array := ARRAY( SELECT json_object_keys(_child_table->'remap'));
 			FOREACH _column IN ARRAY _child_field_array LOOP
 				_sql_cmd := _sql_cmd || format(', %1$I.%2$I', _child_table_name, _column);
-				IF _column = ANY(_child_remap_array) THEN
+				IF (_child_table->'remap'->>_column)::text IS NOT NULL THEN
 					_sql_cmd := _sql_cmd || format( ' AS %I', _child_table->'remap'->>_column );
 				END IF;
 			END LOOP;
