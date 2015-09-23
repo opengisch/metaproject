@@ -1,6 +1,6 @@
 
 
-CREATE TABLE vehicle ( 
+CREATE TABLE vehicle (
 	id serial PRIMARY KEY,
 	year smallint,
 	year_end smallint,
@@ -14,16 +14,16 @@ CREATE TABLE motorbike (
 	id integer REFERENCES vehicle,
 	fk_brand integer REFERENCES motorbike_brand,
 	max_speed smallint); -- not in top class, as some type of vehicle might not have max_speed
-	
+
 CREATE TABLE car (
 	id integer REFERENCES vehicle,
 	fk_brand integer REFERENCES car_brand,
-	max_speed2 smallint);
+	max_speed smallint);
 
-	
+
 INSERT INTO motorbike_brand (id, name) VALUES (1, 'BMW');
 INSERT INTO motorbike_brand (id, name) VALUES (2, 'Triumph');
-	
+
 INSERT INTO car_brand (id, name) VALUES (1, 'Aston Martin');
 INSERT INTO car_brand (id, name) VALUES (2, 'Ferrari');
 
@@ -57,15 +57,18 @@ SELECT fn_inherited_table_view(
 					"for_sale": "year_end IS NULL OR year_end >= extract(year from now())"
 				},
 				"merge_columns": {
-					"max_speed": ["bike.max_speed", "car.max_speed"]
+					"max_speed": {
+						"car": "max_speed",
+						"bike": "max_speed"
+					}
 				}
 			}
-		}	
+		}
 	}'::json
 );
 
 /* insert through the view between parent table and child table */
-INSERT INTO vw_vehicle_car ( model_name, fk_brand, year, year_end, max_speed2 ) VALUES ('DB5', 1, 1963, 1965, 230);
+INSERT INTO vw_vehicle_car ( model_name, fk_brand, year, year_end, max_speed ) VALUES ('DB5', 1, 1963, 1965, 230);
 INSERT INTO vw_vehicle_bike ( model_name, fk_brand, year,  year_end, max_speed ) VALUES ('Bonneville', 2, 1963, 1975, 160);
 
 /* insert through the merge view */
@@ -80,10 +83,4 @@ UPDATE vw_vehicle_all SET max_speed = 256 WHERE model_name = '308 GTS';
 DELETE FROM vw_vehicle_all WHERE model_name = 'R12';
 
 /* select */
-SELECT * FROM vw_vehicle_all;
-
-
-
-
-
-	
+-- SELECT * FROM vw_vehicle_all;
