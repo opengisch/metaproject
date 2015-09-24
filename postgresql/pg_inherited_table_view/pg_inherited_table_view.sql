@@ -30,6 +30,8 @@ $BODY$
 		_destination_schema text;
 		_table_alias text;
 		_column_alias text;
+		_merged_column_aliases text;
+		_merged_column_original text;
 	BEGIN
 		-- there must be only one parent table given (i.e. only 1 entry on the top level of _definition)
 		_parent_table_alias := json_object_keys(_definition);
@@ -240,7 +242,7 @@ $BODY$
 			_child_table := _parent_table->'inherited_by'->_child_table_alias;
 			EXECUTE format(	$$ SELECT ARRAY( SELECT attname FROM pg_attribute WHERE attrelid = %1$L::regclass AND attnum > 0 ORDER BY attnum ASC ) $$, _child_table->>'table_name') INTO _child_field_array;
 			_child_field_array := array_remove(_child_field_array, (_child_table->>'pkey')::text); -- remove pkey from field list
-			-- remove fields which are merged
+			-- remove columns which are merged
 			FOR _column_alias IN SELECT json_object_keys(_merge_view->'merge_columns') LOOP
 				FOR _table_alias IN SELECT json_object_keys(_merge_view->'merge_columns'->_column_alias) LOOP
 					CONTINUE WHEN _table_alias <> _child_table_alias;
@@ -296,6 +298,13 @@ $BODY$
 			_child_table := _parent_table->'inherited_by'->_child_table_alias;
 			EXECUTE format(	$$ SELECT ARRAY( SELECT attname FROM pg_attribute WHERE attrelid = %1$L::regclass AND attnum > 0 ORDER BY attnum ASC ) $$, _child_table->>'table_name') INTO _child_field_array;
 			_child_field_array := array_remove(_child_field_array, (_child_table->>'pkey')::text); -- remove pkey from field list
+			-- remove columns which are merged
+			FOR _column_alias IN SELECT json_object_keys(_merge_view->'merge_columns') LOOP
+				FOR _table_alias IN SELECT json_object_keys(_merge_view->'merge_columns'->_column_alias) LOOP
+					CONTINUE WHEN _table_alias <> _child_table_alias;
+					_child_field_array := array_remove(_child_field_array, (_merge_view->'merge_columns'->_column_alias->>_table_alias)::text);
+				END LOOP;
+			END LOOP;
 			-- create an array with the remapped columns (original columns if not remapped)
 			_child_field_remapped_array := _child_field_array;
 			FOREACH _column IN ARRAY ARRAY( SELECT json_object_keys(_child_table->'remap')) LOOP
@@ -303,8 +312,18 @@ $BODY$
 															_column,
 															_child_table->'remap'->>_column);
 			END LOOP;
+			-- insert from merge columns if they exist
+			_merged_column_aliases := '';
+			_merged_column_original := '';
+			FOR _column_alias IN SELECT json_object_keys(_merge_view->'merge_columns') LOOP
+				FOR _table_alias IN SELECT json_object_keys(_merge_view->'merge_columns'->_column_alias) LOOP
+					CONTINUE WHEN _table_alias <> _child_table_alias;
+					_merged_column_aliases := _merged_column_aliases || ', NEW.' || _column_alias;
+					_merged_column_original := _merged_column_original || ', ' || (_merge_view->'merge_columns'->_column_alias->>_table_alias)::text;
+				END LOOP;
+			END LOOP;
 			_sql_cmd := _sql_cmd || format('
-				WHEN NEW.%1$I::%8$I.%1$I = %2$L THEN INSERT INTO %3$s ( %4$I %5$s ) VALUES (NEW.%6$I %7$s );'
+				WHEN NEW.%1$I::%8$I.%1$I = %2$L THEN INSERT INTO %3$s ( %4$I %5$s %9$s ) VALUES (NEW.%6$I %7$s %10$s);'
 				, _parent_table_alias || '_type' --1
 				, _child_table_alias::text --2
 				, (_child_table->>'table_name')::regclass --3
@@ -313,6 +332,8 @@ $BODY$
 				, (_parent_table->>'pkey')::text --6
 				, CASE WHEN array_length(_child_field_array, 1)>0 THEN  ', NEW.'||array_to_string(_child_field_remapped_array, ', NEW.') ELSE '' END --7
 				, _destination_schema --8
+				, _merged_column_original --9
+				, _merged_column_aliases -- 10
 			);
 		END LOOP;
 		_sql_cmd := _sql_cmd || '
@@ -391,7 +412,14 @@ $BODY$
 			-- write list of fields for update command
 			EXECUTE format(	$$ SELECT ARRAY( SELECT attname FROM pg_attribute WHERE attrelid = %1$L::regclass AND attnum > 0 ORDER BY attnum ASC ) $$, _child_table->>'table_name') INTO _child_field_array;
 			_child_field_array := array_remove(_child_field_array, (_child_table->>'pkey')::text); -- remove pkey from field list
-			SELECT array_to_string(f, ', ') -- create command of update rule for parent fiels
+			-- remove columns which are merged
+			FOR _column_alias IN SELECT json_object_keys(_merge_view->'merge_columns') LOOP
+				FOR _table_alias IN SELECT json_object_keys(_merge_view->'merge_columns'->_column_alias) LOOP
+					CONTINUE WHEN _table_alias <> _child_table_alias;
+					_child_field_array := array_remove(_child_field_array, (_merge_view->'merge_columns'->_column_alias->>_table_alias)::text);
+				END LOOP;
+			END LOOP;
+			SELECT array_to_string(f, ', ') -- create command of update rule for child columns
 				FROM ( 	SELECT array_agg(f||' = NEW.'||
 							CASE
 								WHEN (_child_table->'remap'->>f)::text IS NOT NULL THEN
@@ -403,14 +431,29 @@ $BODY$
 						FROM unnest(_child_field_array) AS f
 					) foo
 				INTO _child_field_list;
-
+			-- update from merge columns if they exist
+			FOR _column_alias IN SELECT json_object_keys(_merge_view->'merge_columns') LOOP
+				FOR _table_alias IN SELECT json_object_keys(_merge_view->'merge_columns'->_column_alias) LOOP
+					CONTINUE WHEN _table_alias <> _child_table_alias;
+					IF _child_field_list IS NULL THEN
+						_child_field_list := '';
+					ELSE
+						_child_field_list := _child_field_list || ', ';
+					END IF;
+					_child_field_list := _child_field_list || format('
+						%1$I = NEW.%2$I'
+						, (_merge_view->'merge_columns'->_column_alias->>_table_alias)::text
+						, _column_alias
+					);
+				END LOOP;
+			END LOOP;
 			_sql_cmd := _sql_cmd || format('
 				WHEN NEW.%1$I::%3$I.%1$I = %2$L THEN '
 				, _parent_table_alias || '_type' --1
 				, _child_table_alias::text --2
 				, _destination_schema --3
 				);
-			IF array_length(_child_field_array, 1) > 0 THEN
+			IF _child_field_list IS NOT NULL THEN
 				_sql_cmd := _sql_cmd || format('
 					UPDATE %1$s SET %2$s WHERE %3$I = OLD.%3$I;'
 					, (_child_table->>'table_name')::regclass --1

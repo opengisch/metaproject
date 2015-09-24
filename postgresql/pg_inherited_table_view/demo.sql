@@ -57,7 +57,7 @@ SELECT fn_inherited_table_view(
 					"for_sale": "year_end IS NULL OR year_end >= extract(year from now())"
 				},
 				"merge_columns": {
-					"max_speed": {
+					"top_speed": {
 						"car": "max_speed",
 						"bike": "max_speed"
 					}
@@ -73,11 +73,11 @@ INSERT INTO vw_vehicle_bike ( model_name, fk_brand, year,  year_end, max_speed )
 
 /* insert through the merge view */
 INSERT INTO vw_vehicle_all ( vehicle_type, model_name, fk_car_brand, year, year_end) VALUES ('car','308 GTS', 2, 1977, 1985 );
-INSERT INTO vw_vehicle_all ( vehicle_type, model_name, fk_bike_brand, year, year_end, max_speed) VALUES ('bike','R12', 1, 1937, 1940, 110 );
-INSERT INTO vw_vehicle_all ( vehicle_type, model_name, fk_bike_brand, year, max_speed) VALUES ('bike','R1200GS', 1, 2004, 208 );
+INSERT INTO vw_vehicle_all ( vehicle_type, model_name, fk_bike_brand, year, year_end, top_speed) VALUES ('bike','R12', 1, 1937, 1940, 110 );
+INSERT INTO vw_vehicle_all ( vehicle_type, model_name, fk_bike_brand, year, top_speed) VALUES ('bike','R1200GS', 1, 2004, 208 );
 
 /* update */
-UPDATE vw_vehicle_all SET max_speed = 256 WHERE model_name = '308 GTS';
+UPDATE vw_vehicle_all SET top_speed = 256 WHERE model_name = '308 GTS';
 
 /* delete */
 DELETE FROM vw_vehicle_all WHERE model_name = 'R12';
