@@ -56,6 +56,7 @@ SELECT fn_inherited_table_view(
 				"additional_columns": {
 					"for_sale": "year_end IS NULL OR year_end >= extract(year from now())"
 				},
+				"allow_type_change": false,
 				"merge_columns": {
 					"top_speed": {
 						"car": "max_speed",
@@ -84,3 +85,6 @@ DELETE FROM vw_vehicle_all WHERE model_name = 'R12';
 
 /* select */
 -- SELECT * FROM vw_vehicle_all;
+
+/* switching type should raise an error */
+-- UPDATE vw_vehicle_all SET vehicle_type = 'bike' WHERE model_name = 'DB5';

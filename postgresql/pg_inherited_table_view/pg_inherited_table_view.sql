@@ -373,38 +373,48 @@ $BODY$
 		END IF;
 		_sql_cmd := _sql_cmd || format('
 			/* Allow change type */
-			IF OLD.%1$I <> NEW.%1$I::%2$I.%1$I THEN CASE'
+			IF OLD.%1$I <> NEW.%1$I::%2$I.%1$I THEN '
 			, _parent_table_alias || '_type' --1
 			, _destination_schema --2
 		);
-		FOR _child_table_alias IN SELECT json_object_keys(_parent_table->'inherited_by') LOOP
-			_child_table := _parent_table->'inherited_by'->_child_table_alias;
+		IF (_merge_view->>'allow_type_change')::boolean IS TRUE THEN
+			_sql_cmd := _sql_cmd || ' CASE';
+			FOR _child_table_alias IN SELECT json_object_keys(_parent_table->'inherited_by') LOOP
+				_child_table := _parent_table->'inherited_by'->_child_table_alias;
+				_sql_cmd := _sql_cmd || format('
+					WHEN OLD.%1$I::%5$I.%1$I = %2$L THEN DELETE FROM %3$s WHERE %4$I = OLD.%4$I;'
+					, _parent_table_alias || '_type' --1
+					, _child_table_alias::text --2
+					, (_child_table->>'table_name')::regclass --3
+					, (_child_table->>'pkey')::text --4
+					, _destination_schema --5
+				);
+			END LOOP;
+			_sql_cmd := _sql_cmd || '
+				END CASE;
+				CASE';
+			FOR _child_table_alias IN SELECT json_object_keys(_parent_table->'inherited_by') LOOP
+				_child_table := _parent_table->'inherited_by'->_child_table_alias;
+				_sql_cmd := _sql_cmd || format('
+					WHEN NEW.%1$I::%6$I.%1$I = %2$L THEN INSERT INTO %3$s (%4$I) VALUES (OLD.%5$I);'
+					, _parent_table_alias || '_type' --1
+					, _child_table_alias::text --2
+					, (_child_table->>'table_name')::regclass --3
+					, (_child_table->>'pkey')::text --4
+					, (_parent_table->>'pkey')::text --5
+					, _destination_schema --6
+				);
+			END LOOP;
+			_sql_cmd := _sql_cmd || '
+				END CASE;';
+		ELSE
 			_sql_cmd := _sql_cmd || format('
-				WHEN OLD.%1$I::%5$I.%1$I = %2$L THEN DELETE FROM %3$s WHERE %4$I = OLD.%4$I;'
-				, _parent_table_alias || '_type' --1
-				, _child_table_alias::text --2
-				, (_child_table->>'table_name')::regclass --3
-				, (_child_table->>'pkey')::text --4
-				, _destination_schema --5
+				RAISE EXCEPTION ''Type change not allowed for %1$s''
+					USING HINT = ''You cannot switch from '' || OLD.%1$s_type ||'' to ''||NEW.%1$s_type;'
+				, _parent_table_alias
 			);
-		END LOOP;
+		END IF;
 		_sql_cmd := _sql_cmd || '
-			END CASE;
-			CASE';
-		FOR _child_table_alias IN SELECT json_object_keys(_parent_table->'inherited_by') LOOP
-			_child_table := _parent_table->'inherited_by'->_child_table_alias;
-			_sql_cmd := _sql_cmd || format('
-				WHEN NEW.%1$I::%6$I.%1$I = %2$L THEN INSERT INTO %3$s (%4$I) VALUES (OLD.%5$I);'
-				, _parent_table_alias || '_type' --1
-				, _child_table_alias::text --2
-				, (_child_table->>'table_name')::regclass --3
-				, (_child_table->>'pkey')::text --4
-				, (_parent_table->>'pkey')::text --5
-				, _destination_schema --6
-			);
-		END LOOP;
-		_sql_cmd := _sql_cmd || '
-			END CASE;
 			END IF;
 			CASE ';
 		FOR _child_table_alias IN SELECT json_object_keys(_parent_table->'inherited_by') LOOP
