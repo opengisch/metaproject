@@ -198,7 +198,8 @@ $BODY$
 			);
 		END LOOP;
 		_sql_cmd := _sql_cmd || format('
-			ELSE NULL::%2$I.%1$s_type END AS %1$s_type'
+				ELSE NULL::%2$I.%1$s_type 
+			END AS %1$s_type'
 			, _parent_table_alias --1
 			, _destination_schema --2
 		);
