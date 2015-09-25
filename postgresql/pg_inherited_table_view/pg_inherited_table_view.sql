@@ -170,6 +170,12 @@ $BODY$
 		END LOOP;
 
 
+		-- do not create merge view if there is only one child table
+		IF COUNT(*) < 2 FROM ( SELECT json_object_keys(_parent_table->'inherited_by')  ) AS foo THEN
+			RETURN;
+		END IF;
+
+
 		-- create enum
 		EXECUTE format('CREATE TYPE %1$I.%2$s_type AS ENUM (''%3$s'');'
 			, _destination_schema
@@ -198,7 +204,7 @@ $BODY$
 			);
 		END LOOP;
 		_sql_cmd := _sql_cmd || format('
-				ELSE NULL::%2$I.%1$s_type 
+				ELSE NULL::%2$I.%1$s_type
 			END AS %1$s_type'
 			, _parent_table_alias --1
 			, _destination_schema --2
