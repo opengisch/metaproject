@@ -1,5 +1,8 @@
 # metaproject
 
+[![Build
+Status](https://travis-ci.org/opengisch/metaproject.svg?branch=master)](https://travis-ci.org/opengisch/metaproject)
+
 A suite of tools and scripts to maintain QGIS project information in json files.
 
 From these json files, postgres data structures and QGIS projects can be generated.
