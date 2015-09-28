@@ -33,7 +33,7 @@ SELECT fn_inherited_table_view(
 		"vehicle": {
 			"table_name":"vehicle",
 			"pkey": "id",
-			"pkey_nextval":"nextval(''vehicle_id_seq'')",
+			"pkey_value":"nextval(''vehicle_id_seq'')",
 			"inherited_by": {
 				"car": {
 					"table_name":"car",

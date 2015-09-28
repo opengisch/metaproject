@@ -98,7 +98,7 @@ $BODY$
 				, (_parent_table->>'table_name')::regclass --2
 				, (_parent_table->>'pkey')::text --3
 				, CASE WHEN array_length(_parent_field_array, 1)>0 THEN ', '||array_to_string(_parent_field_array, ', ') ELSE '' END --4
-				, _parent_table->>'pkey_nextval' --5
+				, _parent_table->>'pkey_value' --5
 				, CASE WHEN array_length(_parent_field_array, 1)>0 THEN ', NEW.'||array_to_string(_parent_field_array, ', NEW.') ELSE '' END  --6
 				, (_child_table->>'table_name')::regclass --7
 				, (_child_table->>'pkey')::text --8
@@ -298,7 +298,7 @@ $BODY$
 			, (_parent_table->>'table_name')::regclass --2
 			, (_parent_table->>'pkey')::text --3
 			, CASE WHEN array_length(_parent_field_array, 1)>0 THEN  ', '||array_to_string(_parent_field_array, ', ') ELSE '' END --4
-			, _parent_table->>'pkey_nextval' --5
+			, _parent_table->>'pkey_value' --5
 			, CASE WHEN array_length(_parent_field_array, 1)>0 THEN  ', NEW.'||array_to_string(_parent_field_array, ', NEW.') ELSE '' END --6
 		);
 		FOR _child_table_alias IN SELECT json_object_keys(_parent_table->'inherited_by') LOOP
