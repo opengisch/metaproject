@@ -83,28 +83,46 @@ $BODY$
 
 			-- insert trigger function
 			RAISE NOTICE '  trigger function';
-			EXECUTE format('
+			_sql_cmd := format('
 				CREATE OR REPLACE FUNCTION %1$s()
 					RETURNS trigger AS
 					$$
-					BEGIN
-						INSERT INTO %2$s ( %3$I %4$s ) VALUES ( %5$s %6$s ) RETURNING %3$I INTO NEW.%3$I;
-						INSERT INTO %7$s ( %8$I %9$s ) VALUES ( NEW.%3$I %10$s );
+					BEGIN'
+				, _function_trigger --1
+			);
+			-- Allow to use function to get existing master entry
+			IF (_parent_table->>'pkey_value_create_entry')::boolean IS TRUE THEN
+				_sql_cmd := _sql_cmd || format('
+							NEW.%4$I := %1$s;
+							UPDATE %2$s SET %3$s WHERE %4$I = NEW.%4$I;'
+					, _parent_table->>'pkey_value' --1
+					, (_parent_table->>'table_name')::regclass --2
+					, _parent_field_list --3
+					, (_parent_table->>'pkey')::text --4
+				);
+			ELSE
+				_sql_cmd := _sql_cmd || format('
+							INSERT INTO %1$s ( %2$I %3$s ) VALUES ( %4$s %5$s ) RETURNING %2$I INTO NEW.%2$I;'
+					, (_parent_table->>'table_name')::regclass --1
+					, (_parent_table->>'pkey')::text --2
+					, CASE WHEN array_length(_parent_field_array, 1)>0 THEN ', '||array_to_string(_parent_field_array, ', ') ELSE '' END --3
+					, _parent_table->>'pkey_value' --4
+					, CASE WHEN array_length(_parent_field_array, 1)>0 THEN ', NEW.'||array_to_string(_parent_field_array, ', NEW.') ELSE '' END  --5
+				);
+			END IF;
+			_sql_cmd := _sql_cmd || format('
+						INSERT INTO %2$s ( %3$I %4$s ) VALUES ( NEW.%1$I %5$s );
 						RETURN NEW;
 					END;
 					$$
 					LANGUAGE plpgsql;'
-				, _function_trigger --1
-				, (_parent_table->>'table_name')::regclass --2
-				, (_parent_table->>'pkey')::text --3
-				, CASE WHEN array_length(_parent_field_array, 1)>0 THEN ', '||array_to_string(_parent_field_array, ', ') ELSE '' END --4
-				, _parent_table->>'pkey_value' --5
-				, CASE WHEN array_length(_parent_field_array, 1)>0 THEN ', NEW.'||array_to_string(_parent_field_array, ', NEW.') ELSE '' END  --6
-				, (_child_table->>'table_name')::regclass --7
-				, (_child_table->>'pkey')::text --8
-				, CASE WHEN array_length(_child_field_array, 1)>0 THEN ', '||array_to_string(_child_field_array, ', ') ELSE '' END --9
-				, CASE WHEN array_length(_child_field_array, 1)>0 THEN ', NEW.'||array_to_string(_child_field_array, ', NEW.') ELSE '' END --10
+				, (_parent_table->>'pkey')::text --1
+				, (_child_table->>'table_name')::regclass --2
+				, (_child_table->>'pkey')::text --3
+				, CASE WHEN array_length(_child_field_array, 1)>0 THEN ', '||array_to_string(_child_field_array, ', ') ELSE '' END --4
+				, CASE WHEN array_length(_child_field_array, 1)>0 THEN ', NEW.'||array_to_string(_child_field_array, ', NEW.') ELSE '' END --5
 			);
+			EXECUTE _sql_cmd;
 
 			-- insert trigger
 			RAISE NOTICE '  trigger';
@@ -123,7 +141,7 @@ $BODY$
 
 			-- update rule
 			RAISE NOTICE '  update rule';
-			SELECT array_to_string(f, ', ') -- create command of update rule for parent fiels
+			SELECT array_to_string(f, ', ') -- create command of update rule for child fiels
 				FROM ( SELECT array_agg(f||' = NEW.'||f) AS f
 				FROM unnest(_child_field_array)     AS f ) foo
 				INTO _child_field_list;
@@ -291,16 +309,31 @@ $BODY$
 		-- insert function trigger for merge view
 		_sql_cmd := format('
 			CREATE OR REPLACE FUNCTION %1$s() RETURNS TRIGGER AS $$
-			BEGIN
-				INSERT INTO %2$s ( %3$I %4$s ) VALUES ( %5$s %6$s ) RETURNING %3$I INTO NEW.%3$I;
-				CASE'
+			BEGIN'
 			, _destination_schema||'.ft_'||_merge_view_rootname||'_insert' --1
-			, (_parent_table->>'table_name')::regclass --2
-			, (_parent_table->>'pkey')::text --3
-			, CASE WHEN array_length(_parent_field_array, 1)>0 THEN  ', '||array_to_string(_parent_field_array, ', ') ELSE '' END --4
-			, _parent_table->>'pkey_value' --5
-			, CASE WHEN array_length(_parent_field_array, 1)>0 THEN  ', NEW.'||array_to_string(_parent_field_array, ', NEW.') ELSE '' END --6
 		);
+		-- Allow to use function to get existing master entry
+		IF (_parent_table->>'pkey_value_create_entry')::boolean IS TRUE THEN
+			_sql_cmd := _sql_cmd || format('
+				NEW.%4$I := %1$s;
+				UPDATE %2$s SET %3$s WHERE %4$I = NEW.%4$I;'
+				, _parent_table->>'pkey_value' --1
+				, (_parent_table->>'table_name')::regclass --2
+				, _parent_field_list --3
+				, (_parent_table->>'pkey')::text --4
+			);
+		ELSE
+			_sql_cmd := _sql_cmd || format('
+				INSERT INTO %1$s ( %2$I %3$s ) VALUES ( %4$s %5$s ) RETURNING %2$I INTO NEW.%2$I;'
+				, (_parent_table->>'table_name')::regclass --1
+				, (_parent_table->>'pkey')::text --2
+				, CASE WHEN array_length(_parent_field_array, 1)>0 THEN  ', '||array_to_string(_parent_field_array, ', ') ELSE '' END --3
+				, _parent_table->>'pkey_value' --4
+				, CASE WHEN array_length(_parent_field_array, 1)>0 THEN  ', NEW.'||array_to_string(_parent_field_array, ', NEW.') ELSE '' END --5
+			);
+		END IF;
+		_sql_cmd := _sql_cmd || '
+			CASE';
 		FOR _child_table_alias IN SELECT json_object_keys(_parent_table->'inherited_by') LOOP
 			_child_table := _parent_table->'inherited_by'->_child_table_alias;
 			EXECUTE format(	$$ SELECT ARRAY( SELECT attname FROM pg_attribute WHERE attrelid = %1$L::regclass AND attnum > 0 ORDER BY attnum ASC ) $$, _child_table->>'table_name') INTO _child_field_array;
@@ -330,7 +363,7 @@ $BODY$
 				END LOOP;
 			END LOOP;
 			_sql_cmd := _sql_cmd || format('
-				WHEN NEW.%1$I::%8$I.%1$I = %2$L THEN INSERT INTO %3$s ( %4$I %5$s %9$s ) VALUES (NEW.%6$I %7$s %10$s);'
+					WHEN NEW.%1$I::%8$I.%1$I = %2$L THEN INSERT INTO %3$s ( %4$I %5$s %9$s ) VALUES (NEW.%6$I %7$s %10$s);'
 				, _parent_table_alias || '_type' --1
 				, _child_table_alias::text --2
 				, (_child_table->>'table_name')::regclass --3
