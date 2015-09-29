@@ -16,17 +16,19 @@ Have a look at [demo.sql](https://github.com/opengisch/metaproject/blob/master/p
 
 ```
 *parent table alias				| "vehicle": {
-                                | 
+                                |
 *table name (schema specified)	| 	"table_name":"vehicle",
-                                | 
+                                |
 *primary key column				| 	"pkey": "id",
-                                | 
+                                |
 *function to get the PK value	| 	"pkey_value":"nextval(''vehicle_id_seq'')",
-                                | 
+ this can also be NEW.id if one	|
+ wants to use the column given  |
+                                |
  if true, the function takes	| 	"pkey_value_create_entry": true,
- care of creating entry. Hence,	| 
- instead of inserting, updates.	| 
-								| 
+ care of creating entry. Hence,	|
+ instead of inserting, updates.	|
+								|
 *								| 	"inherited_by": {
 *								| 		"car": {
 *								| 			"table_name":"car",
@@ -52,19 +54,18 @@ Have a look at [demo.sql](https://github.com/opengisch/metaproject/blob/master/p
 								|
  if false, changing child type	| 		"allow_type_change": false,
  when updating is not allowed.	|
- default is false.				| 
-                                | 
+ default is false.				|
+                                |
  allow inserting on parent		| 		"allow_parent_only": false,
  only. default is true.			|
-								| 
-                                | 
+								|
+                                |
  merge columns in the view		| 		"merge_columns": {
 	alias						| 			"top_speed": {
 		table: column			| 				"car": "max_speed",
 								| 				"bike": "max_speed"
 								| 			}
 								| 		}
-								| 	}
-*: mandatory elements
+								| 	}*: mandatory elements
 ```
 
