@@ -192,8 +192,13 @@ $BODY$
 
 
 
-		-- DO NOT CREATE MERGE VIEW IF THERE IS ONLY ONE CHILD TABLE
+		-- DO NOT CREATE MERGE VIEW 
+		-- if there is only one child table
 		IF COUNT(*) < 2 FROM ( SELECT json_object_keys(_parent_table->'inherited_by')  ) AS foo THEN
+			RETURN;
+		END IF;
+		-- if not defined
+		IF (_parent_table->'merge_view') IS NULL THEN
 			RETURN;
 		END IF;
 
@@ -285,6 +290,7 @@ $BODY$
 					_child_field_array := array_remove(_child_field_array, (_merge_view->'merge_columns'->_column_alias->>_table_alias)::text);
 				END LOOP;
 			END LOOP;
+			-- remap columns
 			FOREACH _column IN ARRAY _child_field_array LOOP
 				_sql_cmd := _sql_cmd || format(', %1$I.%2$I', _child_table_alias, _column);
 				IF (_child_table->'remap'->>_column)::text IS NOT NULL THEN
