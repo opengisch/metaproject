@@ -40,8 +40,8 @@ remap columns					| 				"remap": {
 								|*			"bike": {
 								|*				"table_name":"motorbike",
 								|*				"pkey": "id",
-								| 			"remap": {
-								| 				"fk_brand": "fk_bike_brand"
+								| 				"remap": {
+								| 					"fk_brand": "fk_bike_brand"
 								| 			}
 								| 		}
 								| 	},
