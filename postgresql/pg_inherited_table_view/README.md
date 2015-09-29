@@ -34,7 +34,7 @@ instead of inserting, updates.	|
 								|*				"table_name":"car",
 								|*				"pkey": "id",
 remap columns					| 				"remap": {
-	original: renamed			| 				"fk_brand": "fk_car_brand"
+	original: renamed			| 					"fk_brand": "fk_car_brand"
 								| 			}
 								| 		},
 								|*			"bike": {
