@@ -32,6 +32,8 @@ $BODY$
 		_column_alias text;
 		_merged_column_aliases text;
 		_merged_column_original text;
+		_allow_parent_only boolean;
+		_allow_type_change boolean;
 	BEGIN
 		-- there must be only one parent table given (i.e. only 1 entry on the top level of _definition)
 		_parent_table_alias := json_object_keys(_definition);
@@ -188,20 +190,25 @@ $BODY$
 		END LOOP;
 
 
-		-- do not create merge view if there is only one child table
+
+
+		-- DO NOT CREATE MERGE VIEW IF THERE IS ONLY ONE CHILD TABLE
 		IF COUNT(*) < 2 FROM ( SELECT json_object_keys(_parent_table->'inherited_by')  ) AS foo THEN
 			RETURN;
 		END IF;
 
+		_allow_parent_only := (_parent_table->'merge_view'->>'allow_parent_only')::boolean;
+		_allow_type_change := (_parent_table->'merge_view'->>'allow_type_change')::boolean;
 
-		-- create enum
-		EXECUTE format('CREATE TYPE %1$I.%2$s_type AS ENUM (''%3$s'');'
-			, _destination_schema
-			, _parent_table_alias
-			, array_to_string(ARRAY( SELECT json_object_keys(_parent_table->'inherited_by')), ''', ''')
+		-- CREATE ENUM
+		EXECUTE format('CREATE TYPE %1$I.%2$s_type AS ENUM ( %3$s ''%4$s'');'
+			, _destination_schema --1
+			, _parent_table_alias --2
+			, CASE WHEN _allow_parent_only IS TRUE THEN format('''%s'', ',_parent_table_alias) ELSE '' END--3
+			, array_to_string(ARRAY( SELECT json_object_keys(_parent_table->'inherited_by')), ''', ''') --4
 		);
 
-		-- merge view (all children tables)
+		-- MERGE VIEW (ALL CHILDREN TABLES)
 		_merge_view_rootname := _parent_table->'merge_view'->>'view_name';
 		IF _merge_view_rootname IS NULL THEN
 			_merge_view_rootname := format( 'vw_%I_merge', _parent_table_alias );
@@ -221,11 +228,16 @@ $BODY$
 				, _parent_table_alias --4
 			);
 		END LOOP;
+		IF _allow_parent_only IS TRUE THEN
+			_sql_cmd := _sql_cmd || format('
+				ELSE ''%1$s''::%2$I.%1$s_type'
+				, _parent_table_alias --1
+				, _destination_schema --2
+			);
+		END IF;
 		_sql_cmd := _sql_cmd || format('
-				ELSE NULL::%2$I.%1$s_type
 			END AS %1$s_type'
 			, _parent_table_alias --1
-			, _destination_schema --2
 		);
 		-- add parent table columns
 		_sql_cmd := _sql_cmd || format(',
@@ -246,8 +258,8 @@ $BODY$
 		END LOOP;
 		-- merge columns if needed
 		FOR _column_alias IN SELECT json_object_keys(_merge_view->'merge_columns') LOOP
-			_sql_cmd := _sql_cmd || '
-				, CASE';
+			_sql_cmd := _sql_cmd || ',
+				CASE';
 			FOR _table_alias IN SELECT json_object_keys(_merge_view->'merge_columns'->_column_alias) LOOP
 				_sql_cmd := _sql_cmd || format('
 					WHEN %1$I.%2$I IS NOT NULL THEN %1$I.%3$I'
@@ -261,7 +273,6 @@ $BODY$
 				, _column_alias
 			);
 		END LOOP;
-
 		-- add columns of children tables
 		FOR _child_table_alias IN SELECT json_object_keys(_parent_table->'inherited_by') LOOP
 			_child_table := _parent_table->'inherited_by'->_child_table_alias;
@@ -306,7 +317,7 @@ $BODY$
 
 
 
-		-- insert function trigger for merge view
+		-- INSERT FUNCTION TRIGGER FOR MERGE VIEW
 		_sql_cmd := format('
 			CREATE OR REPLACE FUNCTION %1$s() RETURNS TRIGGER AS $$
 			BEGIN'
@@ -335,6 +346,7 @@ $BODY$
 		_sql_cmd := _sql_cmd || '
 			CASE';
 		FOR _child_table_alias IN SELECT json_object_keys(_parent_table->'inherited_by') LOOP
+			-- create an array with fields of the child table
 			_child_table := _parent_table->'inherited_by'->_child_table_alias;
 			EXECUTE format(	$$ SELECT ARRAY( SELECT attname FROM pg_attribute WHERE attrelid = %1$L::regclass AND attnum > 0 ORDER BY attnum ASC ) $$, _child_table->>'table_name') INTO _child_field_array;
 			_child_field_array := array_remove(_child_field_array, (_child_table->>'pkey')::text); -- remove pkey from field list
@@ -376,6 +388,14 @@ $BODY$
 				, _merged_column_aliases -- 10
 			);
 		END LOOP;
+		IF _allow_parent_only IS FALSE THEN
+			_sql_cmd := _sql_cmd || format('
+					ELSE
+						RAISE EXCEPTION ''Insert on %1$s only is not allowed.''
+					USING HINT = ''It must have a sub-type'';'
+				, _parent_table_alias
+			);
+		END IF;
 		_sql_cmd := _sql_cmd || '
 			END CASE;
 			RETURN NEW;
@@ -397,7 +417,7 @@ $BODY$
 
 
 
-		-- update function trigger for merge view
+		-- UPDATE FUNCTION TRIGGER FOR MERGE VIEW
 		_sql_cmd := format('
 			CREATE OR REPLACE FUNCTION %1$s() RETURNS TRIGGER AS $$
 			BEGIN'
@@ -417,7 +437,19 @@ $BODY$
 			, _parent_table_alias || '_type' --1
 			, _destination_schema --2
 		);
-		IF (_merge_view->>'allow_type_change')::boolean IS TRUE THEN
+		-- do not allow insert on parent only
+		IF _allow_parent_only IS FALSE THEN
+			_sql_cmd := _sql_cmd || format('
+				IF NEW.%1$I IS NULL THEN
+					RAISE EXCEPTION ''Insert on %2$s only is not allowed.''
+						USING HINT = ''It must have a sub-type'';
+				END IF;'
+				, _parent_table_alias || '_type' --1
+				, _parent_table_alias --2
+			);
+		END IF;
+		-- allow type change
+		IF _allow_type_change IS TRUE THEN
 			_sql_cmd := _sql_cmd || ' CASE';
 			FOR _child_table_alias IN SELECT json_object_keys(_parent_table->'inherited_by') LOOP
 				_child_table := _parent_table->'inherited_by'->_child_table_alias;
@@ -447,6 +479,7 @@ $BODY$
 			END LOOP;
 			_sql_cmd := _sql_cmd || '
 				END CASE;';
+		-- do not allow type change
 		ELSE
 			_sql_cmd := _sql_cmd || format('
 				RAISE EXCEPTION ''Type change not allowed for %1$s''
