@@ -49,8 +49,14 @@ Have a look at [demo.sql](https://github.com/opengisch/metaproject/blob/master/p
  definition of additional col.	| 		"additional_columns": {
 	alias: defintion			| 			"for_sale": "year_end IS NULL OR year_end >= extract(year from now())"
 								| 		},
+								|
  if false, changing child type	| 		"allow_type_change": false,
- when updating is not allowed.	| 
+ when updating is not allowed.	|
+ default is false.				| 
+                                | 
+ allow inserting on parent		| 		"allow_parent_only": false,
+ only. default is true.			|
+								| 
                                 | 
  merge columns in the view		| 		"merge_columns": {
 	alias						| 			"top_speed": {
@@ -59,7 +65,6 @@ Have a look at [demo.sql](https://github.com/opengisch/metaproject/blob/master/p
 								| 			}
 								| 		}
 								| 	}
-
 *: mandatory elements
 ```
 
