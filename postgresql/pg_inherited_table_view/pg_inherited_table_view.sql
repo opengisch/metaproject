@@ -192,7 +192,7 @@ $BODY$
 
 
 
-		-- DO NOT CREATE MERGE VIEW 
+		-- DO NOT CREATE MERGE VIEW
 		-- if there is only one child table
 		IF COUNT(*) < 2 FROM ( SELECT json_object_keys(_parent_table->'inherited_by')  ) AS foo THEN
 			RETURN;
@@ -204,8 +204,15 @@ $BODY$
 
 		_allow_parent_only := (_parent_table->'merge_view'->>'allow_parent_only')::boolean;
 		_allow_type_change := (_parent_table->'merge_view'->>'allow_type_change')::boolean;
-
+		IF _allow_parent_only IS NULL THEN
+			_allow_parent_only := true;
+		END IF;
+		IF _allow_type_change IS NULL THEN
+			_allow_type_change := false;
+		END IF;
 		-- CREATE ENUM
+
+
 		EXECUTE format('CREATE TYPE %1$I.%2$s_type AS ENUM ( %3$s ''%4$s'');'
 			, _destination_schema --1
 			, _parent_table_alias --2
