@@ -96,11 +96,18 @@ $BODY$
 			IF (_parent_table->>'pkey_value_create_entry')::boolean IS TRUE THEN
 				_sql_cmd := _sql_cmd || format('
 							NEW.%4$I := %1$s;
+							IF (SELECT %5$s_type NOT IN(NULL::%6$I.%5$s_type, ''%5$s''::%6$I.%5$s_type) FROM %7$s) THEN
+								RAISE EXCEPTION ''Cannot insert %5$s as %8$s since it already has another subtype. ID: %%'', NEW.%4$I;
+							END IF;
 							UPDATE %2$s SET %3$s WHERE %4$I = NEW.%4$I;'
 					, _parent_table->>'pkey_value' --1
 					, (_parent_table->>'table_name')::regclass --2
 					, _parent_field_list --3
 					, (_parent_table->>'pkey')::text --4
+					, _parent_table_alias --5
+					, _destination_schema --6
+					, _view_name --7
+					, _child_table_alias --8
 				);
 			ELSE
 				_sql_cmd := _sql_cmd || format('
@@ -339,13 +346,20 @@ $BODY$
 		-- Allow to use function to get existing master entry
 		IF (_parent_table->>'pkey_value_create_entry')::boolean IS TRUE THEN
 			_sql_cmd := _sql_cmd || format('
-				NEW.%4$I := %1$s;
-				UPDATE %2$s SET %3$s WHERE %4$I = NEW.%4$I;'
+						NEW.%4$I := %1$s;
+						IF (SELECT %5$s_type NOT IN(NULL::%6$I.%5$s_type, ''%5$s''::%6$I.%5$s_type) FROM %7$s) THEN
+							RAISE EXCEPTION ''Cannot insert %5$s as %% since it already has another subtype. ID: %%'', NEW.%5$s_type, NEW.%4$I;
+						END IF;
+						UPDATE %2$s SET %3$s WHERE %4$I = NEW.%4$I;'
 				, _parent_table->>'pkey_value' --1
 				, (_parent_table->>'table_name')::regclass --2
 				, _parent_field_list --3
 				, (_parent_table->>'pkey')::text --4
+				, _parent_table_alias --5
+				, _destination_schema --6
+				, _view_name --7
 			);
+
 		ELSE
 			_sql_cmd := _sql_cmd || format('
 				INSERT INTO %1$s ( %2$I %3$s ) VALUES ( %4$s %5$s ) RETURNING %2$I INTO NEW.%2$I;'
