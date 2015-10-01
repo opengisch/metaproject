@@ -52,7 +52,6 @@ SELECT fn_inherited_table_view(
 			},
 			"merge_view": {
 				"view_name":"vw_vehicle_all",
-				"destination_schema": "public",
 				"additional_columns": {
 					"for_sale": "year_end IS NULL OR year_end >= extract(year from now())"
 				},

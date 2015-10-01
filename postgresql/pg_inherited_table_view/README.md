@@ -20,6 +20,9 @@ parent table alias				|*	"vehicle": {
 table name (schema specified)	|*		"table_name":"vehicle",
 								| 	
 primary key column				|*		"pkey": "id",
+								|
+destination schema				|		"destination_schema": "public",
+(default: public)				|
 								| 	
 function to get the PK value	|*		"pkey_value":"nextval(''vehicle_id_seq'')",
 this can also be NEW.id if one	| 	

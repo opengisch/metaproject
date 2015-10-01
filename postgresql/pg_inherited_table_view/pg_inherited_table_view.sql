@@ -41,7 +41,10 @@ $BODY$
 		_parent_table := _definition->_parent_table_alias;
 
 		_merge_view := _parent_table->'merge_view';
-		_destination_schema := _merge_view->>'destination_schema';
+		_destination_schema := _parent_table->>'destination_schema';
+		IF _destination_schema IS NULL THEN
+			_destination_schema := 'public';
+		END IF;
 		
 		_merge_view_rootname := _parent_table->'merge_view'->>'view_name';
 		IF _merge_view_rootname IS NULL THEN
@@ -74,6 +77,7 @@ $BODY$
 			_child_field_array := array_remove(_child_field_array, (_child_table->>'pkey')::text); -- remove pkey from field list
 
 			-- view
+			RAISE NOTICE 'Create view: %', _view_name;
 			EXECUTE format('
 				CREATE OR REPLACE VIEW %1$s AS
 					SELECT %6$I.%8$I %2$s %3$s
