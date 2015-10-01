@@ -96,7 +96,8 @@ $BODY$
 			IF (_parent_table->>'pkey_value_create_entry')::boolean IS TRUE THEN
 				_sql_cmd := _sql_cmd || format('
 							NEW.%4$I := %1$s;
-							IF (SELECT %5$s_type NOT IN(NULL::%6$I.%5$s_type, ''%5$s''::%6$I.%5$s_type) FROM %7$s) THEN
+							-- the function creates or gets a parent row. If it previously existed with another subtype, it should raise an exception
+							IF (SELECT %5$s_type NOT IN (NULL::%6$I.%5$s_type, ''%5$s''::%6$I.%5$s_type) FROM %7$s WHERE %7$s.%4$I = NEW.%4$I) THEN
 								RAISE EXCEPTION ''Cannot insert %5$s as %8$s since it already has another subtype. ID: %%'', NEW.%4$I;
 							END IF;
 							UPDATE %2$s SET %3$s WHERE %4$I = NEW.%4$I;'
@@ -347,7 +348,8 @@ $BODY$
 		IF (_parent_table->>'pkey_value_create_entry')::boolean IS TRUE THEN
 			_sql_cmd := _sql_cmd || format('
 						NEW.%4$I := %1$s;
-						IF (SELECT %5$s_type NOT IN(NULL::%6$I.%5$s_type, ''%5$s''::%6$I.%5$s_type) FROM %7$s) THEN
+							-- the function creates or gets a parent row. If it previously existed with another subtype, it should raise an exception
+							IF (SELECT %5$s_type NOT IN (NULL::%6$I.%5$s_type, ''%5$s''::%6$I.%5$s_type) FROM %7$s WHERE %7$s.%4$I = NEW.%4$I) THEN
 							RAISE EXCEPTION ''Cannot insert %5$s as %% since it already has another subtype. ID: %%'', NEW.%5$s_type, NEW.%4$I;
 						END IF;
 						UPDATE %2$s SET %3$s WHERE %4$I = NEW.%4$I;'
