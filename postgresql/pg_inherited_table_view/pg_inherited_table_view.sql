@@ -42,6 +42,12 @@ $BODY$
 
 		_merge_view := _parent_table->'merge_view';
 		_destination_schema := _merge_view->>'destination_schema';
+		
+		_merge_view_rootname := _parent_table->'merge_view'->>'view_name';
+		IF _merge_view_rootname IS NULL THEN
+			_merge_view_rootname := format( 'vw_%I_merge', _parent_table_alias );
+		END IF;
+		_merge_view_name := _destination_schema||'.'||_merge_view_rootname;
 
 		-- get array of fields for parent table
 		EXECUTE format(	$$ SELECT ARRAY( SELECT attname FROM pg_attribute WHERE attrelid = %1$L::regclass AND attnum > 0 ORDER BY attnum ASC ) $$, _parent_table->>'table_name') INTO _parent_field_array;
@@ -91,14 +97,15 @@ $BODY$
 					$$
 					BEGIN'
 				, _function_trigger --1
-			);
+			);						
+						
 			-- Allow to use function to get existing master entry
 			IF (_parent_table->>'pkey_value_create_entry')::boolean IS TRUE THEN
 				_sql_cmd := _sql_cmd || format('
 							NEW.%4$I := %1$s;
 							-- the function creates or gets a parent row. If it previously existed with another subtype, it should raise an exception
-							IF (SELECT %5$s_type NOT IN (NULL::%6$I.%5$s_type, ''%5$s''::%6$I.%5$s_type) FROM %7$s WHERE %7$s.%4$I = NEW.%4$I) THEN
-								RAISE EXCEPTION ''Cannot insert %5$s as %8$s since it already has another subtype. ID: %%'', NEW.%4$I;
+							IF (SELECT _oid IS NOT NULL FROM (%7$s) AS foo WHERE _oid = NEW.%4$I) THEN
+								RAISE EXCEPTION ''Cannot insert %5$s as %6$s since it already has another subtype. ID: %%'', NEW.%4$I;
 							END IF;
 							UPDATE %2$s SET %3$s WHERE %4$I = NEW.%4$I;'
 					, _parent_table->>'pkey_value' --1
@@ -106,9 +113,21 @@ $BODY$
 					, _parent_field_list --3
 					, (_parent_table->>'pkey')::text --4
 					, _parent_table_alias --5
-					, _destination_schema --6
-					, _view_name --7
-					, _child_table_alias --8
+					, _child_table_alias --6
+					, array_to_string( 
+						ARRAY(
+							SELECT 
+								'SELECT '
+								|| (_parent_table->'inherited_by'->json_object_keys->>'pkey')
+								|| ' AS _oid '
+								|| ' FROM '
+								|| (_parent_table->'inherited_by'->json_object_keys->>'table_name' ) || '
+								'
+							FROM (
+								SELECT json_object_keys(_parent_table->'inherited_by')
+								) 
+							AS foo 
+						), ' UNION ')
 				);
 			ELSE
 				_sql_cmd := _sql_cmd || format('
@@ -229,12 +248,7 @@ $BODY$
 		);
 
 		-- MERGE VIEW (ALL CHILDREN TABLES)
-		_merge_view_rootname := _parent_table->'merge_view'->>'view_name';
-		IF _merge_view_rootname IS NULL THEN
-			_merge_view_rootname := format( 'vw_%I_merge', _parent_table_alias );
-		END IF;
-		_merge_view_name := _destination_schema||'.'||_merge_view_rootname;
-		-- create view and use first column to define type of inherited table
+		-- use first column to define type of inherited table
 		_sql_cmd := format('CREATE OR REPLACE VIEW %s AS SELECT
 			CASE ', _merge_view_name); -- create field to determine inherited table
 
@@ -359,7 +373,7 @@ $BODY$
 				, (_parent_table->>'pkey')::text --4
 				, _parent_table_alias --5
 				, _destination_schema --6
-				, _view_name --7
+				, _merge_view_name --7
 			);
 
 		ELSE
