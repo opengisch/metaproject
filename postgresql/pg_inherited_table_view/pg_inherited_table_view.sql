@@ -222,13 +222,8 @@ $BODY$
 
 
 
-
-		-- DO NOT CREATE MERGE VIEW
-		-- if there is only one child table
-		IF COUNT(*) < 2 FROM ( SELECT json_object_keys(_parent_table->'inherited_by')  ) AS foo THEN
-			RETURN;
-		END IF;
-		-- if not defined
+		-- MERGCE VIEW
+		-- do not create merge view if not defined
 		IF (_parent_table->'merge_view') IS NULL THEN
 			RETURN;
 		END IF;
