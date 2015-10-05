@@ -68,8 +68,8 @@ SELECT fn_inherited_table_view(
 );
 
 /* insert through the view between parent table and child table */
-INSERT INTO vw_vehicle_car ( model_name, fk_brand, year, year_end, max_speed ) VALUES ('DB5', 1, 1963, 1965, 230);
-INSERT INTO vw_vehicle_bike ( model_name, fk_brand, year,  year_end, max_speed ) VALUES ('Bonneville', 2, 1963, 1975, 160);
+INSERT INTO vw_vehicle_car ( model_name, fk_car_brand, year, year_end, max_speed ) VALUES ('DB5', 1, 1963, 1965, 230);
+INSERT INTO vw_vehicle_bike ( model_name, fk_bike_brand, year,  year_end, max_speed ) VALUES ('Bonneville', 2, 1963, 1975, 160);
 
 /* insert through the merge view */
 INSERT INTO vw_vehicle_all ( vehicle_type, model_name, fk_car_brand, year, year_end) VALUES ('car','308 GTS', 2, 1977, 1985 );

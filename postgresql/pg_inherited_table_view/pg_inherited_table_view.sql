@@ -34,6 +34,7 @@ $BODY$
 		_merged_column_original text;
 		_allow_parent_only boolean;
 		_allow_type_change boolean;
+		_i integer;
 	BEGIN
 		-- there must be only one parent table given (i.e. only 1 entry on the top level of _definition)
 		_parent_table_alias := json_object_keys(_definition);
@@ -45,7 +46,7 @@ $BODY$
 		IF _destination_schema IS NULL THEN
 			_destination_schema := 'public';
 		END IF;
-		
+
 		_merge_view_rootname := _parent_table->'merge_view'->>'view_name';
 		IF _merge_view_rootname IS NULL THEN
 			_merge_view_rootname := format( 'vw_%I_merge', _parent_table_alias );
@@ -62,7 +63,7 @@ $BODY$
 			FROM unnest(_parent_field_array) AS f ) foo
 			INTO _parent_field_list;
 
-  		-- create view and triggers/rules for 1:1 joined view
+  		-- CREATE VIEW AND TRIGGERS/RULES FOR 1:1 JOINED VIEW
   		FOR _child_table_alias IN SELECT json_object_keys(_parent_table->'inherited_by') LOOP
 			_child_table := _parent_table->'inherited_by'->_child_table_alias;
 			RAISE NOTICE 'edit view for %', _child_table_alias;
@@ -76,24 +77,55 @@ $BODY$
 			EXECUTE format(	$$ SELECT ARRAY( SELECT attname FROM pg_attribute WHERE attrelid = %1$L::regclass AND attnum > 0 ORDER BY attnum ASC ) $$, _child_table->>'table_name') INTO _child_field_array;
 			_child_field_array := array_remove(_child_field_array, (_child_table->>'pkey')::text); -- remove pkey from field list
 
-			-- view
-			RAISE NOTICE 'Create view: %', _view_name;
-			EXECUTE format('
-				CREATE OR REPLACE VIEW %1$s AS
-					SELECT %6$I.%8$I %2$s %3$s
-				FROM %5$s %7$I INNER JOIN %4$s %6$I ON %6$I.%8$I = %7$I.%9$I;'
-				, _view_name --1
-				, CASE WHEN array_length(_parent_field_array,1)>0 THEN ', '||_parent_table_alias||'.'||array_to_string(_parent_field_array,', '||_parent_table_alias||'.') ELSE '' END --2
-				, CASE WHEN array_length(_child_field_array ,1)>0 THEN ', '||_child_table_alias ||'.'||array_to_string(_child_field_array, ', '||_child_table_alias ||'.') ELSE '' END --3
-				, (_parent_table->>'table_name')::regclass --4
-				, (_child_table->>'table_name')::regclass --5
-				, _parent_table_alias --6
-				, _child_table_alias --7
-				, _parent_table->>'pkey' --8
-				, _child_table->>'pkey' --9
-			);
 
-			-- insert trigger function
+			-- CREATE VIEW
+			RAISE NOTICE 'Create view: %', _view_name;
+			_sql_cmd := format('
+				CREATE OR REPLACE VIEW %1$s AS
+					SELECT %2$I.%3$I'
+				, _view_name --1
+				, _parent_table_alias --2
+				, _parent_table->>'pkey' --3
+			);
+			-- add columns
+			FOREACH _column IN ARRAY _parent_field_array LOOP
+				IF (_parent_table->'alter'->>_column)::text IS NOT NULL THEN
+					_sql_cmd := _sql_cmd || ', ' || (_parent_table->'alter'->>_column)::text;
+					IF (_parent_table->'remap'->>_column)::text IS NULL THEN
+						_sql_cmd := _sql_cmd || format( ' AS %I', _column ); -- if no remap, reuse original column name
+					END IF;
+				ELSE
+					_sql_cmd := _sql_cmd || format(', %1$I.%2$I', _parent_table_alias, _column);
+				END IF;
+				IF (_parent_table->'remap'->>_column)::text IS NOT NULL THEN
+					_sql_cmd := _sql_cmd || format( ' AS %I', _parent_table->'remap'->>_column );
+				END IF;
+			END LOOP;
+			FOREACH _column IN ARRAY _child_field_array LOOP
+				IF (_child_table->'alter'->>_column)::text IS NOT NULL THEN
+					_sql_cmd := _sql_cmd || ', ' || (_child_table->'alter'->>_column)::text;
+					IF (_child_table->'remap'->>_column)::text IS NULL THEN
+						_sql_cmd := _sql_cmd || format( ' AS %I', _column ); -- if no remap, reuse original column name
+					END IF;			ELSE
+					_sql_cmd := _sql_cmd || format(', %1$I.%2$I', _child_table_alias, _column);
+				END IF;
+				IF (_child_table->'remap'->>_column)::text IS NOT NULL THEN
+					_sql_cmd := _sql_cmd || format( ' AS %I', _child_table->'remap'->>_column );
+				END IF;
+			END LOOP;
+			_sql_cmd := _sql_cmd || format('
+				FROM %2$s %4$I INNER JOIN %1$s %3$I ON %3$I.%5$I = %4$I.%6$I;'
+				, (_parent_table->>'table_name')::regclass --1
+				, (_child_table->>'table_name')::regclass --2
+				, _parent_table_alias --3
+				, _child_table_alias --4
+				, _parent_table->>'pkey' --5
+				, _child_table->>'pkey' --6
+			);
+			EXECUTE _sql_cmd;
+
+
+			-- INSERT TRIGGER FUNCTION
 			RAISE NOTICE '  trigger function';
 			_sql_cmd := format('
 				CREATE OR REPLACE FUNCTION %1$s()
@@ -101,60 +133,101 @@ $BODY$
 					$$
 					BEGIN'
 				, _function_trigger --1
-			);						
-						
+			);
+
 			-- Allow to use function to get existing master entry
 			IF (_parent_table->>'pkey_value_create_entry')::boolean IS TRUE THEN
 				_sql_cmd := _sql_cmd || format('
-							NEW.%4$I := %1$s;
+							NEW.%3$I := %1$s;
 							-- the function creates or gets a parent row. If it previously existed with another subtype, it should raise an exception
-							IF (SELECT _oid IS NOT NULL FROM (%7$s) AS foo WHERE _oid = NEW.%4$I) THEN
-								RAISE EXCEPTION ''Cannot insert %5$s as %6$s since it already has another subtype. ID: %%'', NEW.%4$I;
+							IF (SELECT _oid IS NOT NULL FROM (%6$s) AS foo WHERE _oid = NEW.%3$I) THEN
+								RAISE EXCEPTION ''Cannot insert %4$s as %5$s since it already has another subtype. ID: %%'', NEW.%3$I;
 							END IF;
-							UPDATE %2$s SET %3$s WHERE %4$I = NEW.%4$I;'
+							UPDATE %2$s SET'
 					, _parent_table->>'pkey_value' --1
 					, (_parent_table->>'table_name')::regclass --2
-					, _parent_field_list --3
-					, (_parent_table->>'pkey')::text --4
-					, _parent_table_alias --5
-					, _child_table_alias --6
-					, array_to_string( 
+					, (_parent_table->>'pkey')::text --3
+					, _parent_table_alias --4
+					, _child_table_alias --5
+					, array_to_string( --6
 						ARRAY(
-							SELECT 
+							SELECT
 								'SELECT '
-								|| (_parent_table->'inherited_by'->json_object_keys->>'pkey')
+								|| (_parent_table->'inherited_by'->foo.json_object_keys->>'pkey')
 								|| ' AS _oid '
 								|| ' FROM '
-								|| (_parent_table->'inherited_by'->json_object_keys->>'table_name' ) || '
+								|| (_parent_table->'inherited_by'->foo.json_object_keys->>'table_name' ) || '
 								'
 							FROM (
 								SELECT json_object_keys(_parent_table->'inherited_by')
-								) 
-							AS foo 
-						), ' UNION ')
+								)
+							AS foo
+						), ' UNION ') --6
+				);
+				FOREACH _column IN ARRAY _parent_field_array LOOP
+					_sql_cmd = _sql_cmd || format('
+								%1$I = NEW.%2$I, '
+					, _column --1
+					, CASE --2
+						WHEN (_parent_table->'remap'->>_column)::text IS NOT NULL THEN
+							_parent_table->'remap'->>_column
+						ELSE
+							_column
+						END --2
+				);
+				END LOOP;
+				_sql_cmd := left( _sql_cmd, -2 ); -- remove extra comma
+				_sql_cmd := _sql_cmd || format('
+							WHERE %1$I = NEW.%1$I;'
+					, (_parent_table->>'pkey')::text --4
 				);
 			ELSE
 				_sql_cmd := _sql_cmd || format('
-							INSERT INTO %1$s ( %2$I %3$s ) VALUES ( %4$s %5$s ) RETURNING %2$I INTO NEW.%2$I;'
+							INSERT INTO %1$s ( %2$I %3$s ) VALUES ( %4$s'
 					, (_parent_table->>'table_name')::regclass --1
 					, (_parent_table->>'pkey')::text --2
 					, CASE WHEN array_length(_parent_field_array, 1)>0 THEN ', '||array_to_string(_parent_field_array, ', ') ELSE '' END --3
 					, _parent_table->>'pkey_value' --4
-					, CASE WHEN array_length(_parent_field_array, 1)>0 THEN ', NEW.'||array_to_string(_parent_field_array, ', NEW.') ELSE '' END  --5
 				);
+				FOREACH _column IN ARRAY _parent_field_array LOOP
+					_sql_cmd = _sql_cmd || format(', NEW.%1$I'
+					, CASE --1
+						WHEN (_parent_table->'remap'->>_column)::text IS NOT NULL THEN
+							_parent_table->'remap'->>_column
+						ELSE
+							_column
+						END --1
+				);
+				END LOOP;
+				_sql_cmd := _sql_cmd || format('
+							) RETURNING %1$I INTO NEW.%1$I;'
+					, (_parent_table->>'pkey')::text --1
+				);
+
 			END IF;
 			_sql_cmd := _sql_cmd || format('
-						INSERT INTO %2$s ( %3$I %4$s ) VALUES ( NEW.%1$I %5$s );
-						RETURN NEW;
-					END;
-					$$
-					LANGUAGE plpgsql;'
+						INSERT INTO %2$s ( %3$I %4$s ) VALUES ( NEW.%1$I'
 				, (_parent_table->>'pkey')::text --1
 				, (_child_table->>'table_name')::regclass --2
 				, (_child_table->>'pkey')::text --3
 				, CASE WHEN array_length(_child_field_array, 1)>0 THEN ', '||array_to_string(_child_field_array, ', ') ELSE '' END --4
-				, CASE WHEN array_length(_child_field_array, 1)>0 THEN ', NEW.'||array_to_string(_child_field_array, ', NEW.') ELSE '' END --5
 			);
+			FOREACH _column IN ARRAY _child_field_array LOOP
+				_sql_cmd := _sql_cmd || format(', NEW.%1$I'
+				, CASE --1
+					WHEN (_child_table->'remap'->>_column)::text IS NOT NULL THEN
+						_child_table->'remap'->>_column
+					ELSE
+						_column
+					END --1
+			);
+			END LOOP;
+			_sql_cmd := _sql_cmd || ');
+						RETURN NEW;
+					END;
+					$$
+					LANGUAGE plpgsql;';
+
 			EXECUTE _sql_cmd;
 
 			-- insert trigger
@@ -186,18 +259,48 @@ $BODY$
 			);
 			IF array_length(_parent_field_array, 1)>0 THEN
 				_sql_cmd := _sql_cmd || format('
-						UPDATE %1$s SET %2$s WHERE %3$I = OLD.%3$I;'
+						UPDATE %1$s SET '
 				, (_parent_table->>'table_name')::regclass --1
-				, _parent_field_list --2
-				, (_parent_table->>'pkey')::text --3
+				);
+				FOREACH _column IN ARRAY _parent_field_array LOOP
+					_sql_cmd = _sql_cmd || format('
+								%1$I = NEW.%2$I, '
+					, _column --1
+					, CASE --2
+						WHEN (_parent_table->'remap'->>_column)::text IS NOT NULL THEN
+							_parent_table->'remap'->>_column
+						ELSE
+							_column
+						END --2
+				);
+				END LOOP;
+				_sql_cmd := left( _sql_cmd, -2 ); -- remove extra comma
+				_sql_cmd := _sql_cmd || format('
+						WHERE %1$I = OLD.%1$I;'
+					, (_parent_table->>'pkey')::text --1
 				);
 			END IF;
 			IF array_length(_child_field_array, 1)>0 THEN
 				_sql_cmd := _sql_cmd || format('
-					UPDATE %1$s SET %2$s WHERE %3$I = OLD.%3$I;'
-				, (_child_table->>'table_name')::regclass --1
-				, _child_field_list --2
-				, (_child_table->>'pkey')::text --3
+					UPDATE %1$s SET '
+					, (_child_table->>'table_name')::regclass --1
+				);
+				FOREACH _column IN ARRAY _child_field_array LOOP
+					_sql_cmd = _sql_cmd || format('
+								%1$I = NEW.%2$I, '
+					, _column --1
+					, CASE --2
+						WHEN (_child_table->'remap'->>_column)::text IS NOT NULL THEN
+							_child_table->'remap'->>_column
+						ELSE
+							_column
+						END --2
+				);
+				END LOOP;
+				_sql_cmd := left( _sql_cmd, -2 ); -- remove extra comma
+				_sql_cmd := _sql_cmd || format('
+					WHERE %1$I = OLD.%1$I;'
+					, (_child_table->>'pkey')::text --1
 				);
 			END IF;
 			_sql_cmd := _sql_cmd || ')';
@@ -222,6 +325,10 @@ $BODY$
 
 
 
+
+		-- ***************
+		-- ***************
+		-- ***************
 		-- MERGCE VIEW
 		-- do not create merge view if not defined
 		IF (_parent_table->'merge_view') IS NULL THEN
@@ -269,18 +376,25 @@ $BODY$
 			);
 		END IF;
 		_sql_cmd := _sql_cmd || format('
-			END AS %1$s_type'
-			, _parent_table_alias --1
-		);
-		-- add parent table columns
-		_sql_cmd := _sql_cmd || format(',
-			%1$I.%2$I %3$s '
+			END AS %1$s_type,
+			%1$I.%2$I'
 			, _parent_table_alias --1
 			, (_parent_table->>'pkey')::text --2
-			, CASE WHEN array_length(_parent_field_array, 1)>0 THEN ',
-			 	'||_parent_table_alias||'.'||array_to_string(_parent_field_array, ',
-					 '||_parent_table_alias||'.') ELSE '' END --3 parent table fields if they exist
 		);
+		-- add parent table columns		
+		FOREACH _column IN ARRAY _parent_field_array LOOP
+			IF (_parent_table->'alter'->>_column)::text IS NOT NULL THEN
+				_sql_cmd := _sql_cmd || ', ' || (_parent_table->'alter'->>_column)::text;
+				IF (_parent_table->'remap'->>_column)::text IS NULL THEN
+					_sql_cmd := _sql_cmd || format( ' AS %I', _column ); -- if no remap, reuse original column name
+				END IF;
+			ELSE
+				_sql_cmd := _sql_cmd || format(', %1$I.%2$I', _parent_table_alias, _column);
+			END IF;
+			IF (_parent_table->'remap'->>_column)::text IS NOT NULL THEN
+				_sql_cmd := _sql_cmd || format( ' AS %I', _parent_table->'remap'->>_column );
+			END IF;
+		END LOOP;
 		-- additional columns if they exists
 		FOR _additional_column IN SELECT json_object_keys(_parent_table->'merge_view'->'additional_columns') LOOP
 			_sql_cmd := _sql_cmd || format(',
@@ -318,9 +432,17 @@ $BODY$
 					_child_field_array := array_remove(_child_field_array, (_merge_view->'merge_columns'->_column_alias->>_table_alias)::text);
 				END LOOP;
 			END LOOP;
-			-- remap columns
+			-- alter/remap and add columns
+			
 			FOREACH _column IN ARRAY _child_field_array LOOP
-				_sql_cmd := _sql_cmd || format(', %1$I.%2$I', _child_table_alias, _column);
+				IF (_child_table->'alter'->>_column)::text IS NOT NULL THEN
+					_sql_cmd := _sql_cmd || ', ' || (_child_table->'alter'->>_column)::text;
+					IF (_child_table->'remap'->>_column)::text IS NULL THEN
+						_sql_cmd := _sql_cmd || format( ' AS %I', _column ); -- if no remap, reuse original column name
+					END IF;
+				ELSE
+					_sql_cmd := _sql_cmd || format(', %1$I.%2$I', _child_table_alias, _column);
+				END IF;
 				IF (_child_table->'remap'->>_column)::text IS NOT NULL THEN
 					_sql_cmd := _sql_cmd || format( ' AS %I', _child_table->'remap'->>_column );
 				END IF;
