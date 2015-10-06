@@ -14,7 +14,6 @@ $BODY$
 		_child_table json;
 		_parent_field_array text[];
 		_child_field_array text[];
-		_child_field_remapped_array text[];
 		_merged_field_list text;
 		_merge_view json;
 		_view_rootname text;
@@ -22,7 +21,6 @@ $BODY$
 		_column text;
 		_function_trigger text;
 		_merge_view_name text;
-		_merge_delete_cmd text;
 		_merge_view_rootname text;
 		_additional_column text;
 		_sql_cmd text;
@@ -33,7 +31,6 @@ $BODY$
 		_merged_column_original text;
 		_allow_parent_only boolean;
 		_allow_type_change boolean;
-		_i integer;
 	BEGIN
 		-- there must be only one parent table given (i.e. only 1 entry on the top level of _definition)
 		_parent_table_alias := json_object_keys(_definition);
