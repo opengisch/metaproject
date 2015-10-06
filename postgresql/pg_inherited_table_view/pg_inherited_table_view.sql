@@ -732,6 +732,7 @@ $BODY$
 				END LOOP;
 			END LOOP;
 			-- update from merge columns if they exist
+			_merged_field_list := NULL::text;
 			FOR _column_alias IN SELECT json_object_keys(_merge_view->'merge_columns') LOOP
 				FOR _table_alias IN SELECT json_object_keys(_merge_view->'merge_columns'->_column_alias) LOOP
 					CONTINUE WHEN _table_alias <> _child_table_alias;
