@@ -308,20 +308,46 @@ $BODY$
 			_sql_cmd := _sql_cmd || ')';
 			EXECUTE _sql_cmd;
 
-			-- delete rule
-			RAISE NOTICE '  delete rule';
+			-- delete trigger
+			RAISE NOTICE '  delete trigger';
+			_sql_cmd := format('
+				CREATE OR REPLACE FUNCTION %1$s()
+					RETURNS trigger AS
+					$$
+						BEGIN
+							DELETE FROM %2$s WHERE %3$I = OLD.%3$I;'
+				, _destination_schema||'.ft_'||_parent_table_alias||'_'||_child_table_alias||'_delete' --1
+				, (_child_table->>'table_name')::regclass --2
+				, (_child_table->>'pkey')::text --3
+			);
+			IF (_child_table->>'custom_parent_delete')::text IS NOT NULL THEN
+				_sql_cmd := _sql_cmd ||  format('
+							%1$s'
+					, (_child_table->>'custom_parent_delete')::text --1
+				);
+			ELSE
+				_sql_cmd := _sql_cmd ||  format('
+							DELETE FROM %1$s WHERE %2$I = OLD.%2$I;'
+					, (_parent_table->>'table_name')::regclass --1
+					, (_parent_table->>'pkey')::text --2
+				);
+			END IF;
+			_sql_cmd := _sql_cmd || '
+							RETURN NULL;
+						END;
+					$$
+					LANGUAGE plpgsql;';
+			EXECUTE _sql_cmd;
 			EXECUTE format('
-				CREATE OR REPLACE RULE %1$I AS ON DELETE TO %2$s DO INSTEAD
-				(
-				DELETE FROM %3$s WHERE %4$I = OLD.%4$I;
-				DELETE FROM %5$s WHERE %6$I = OLD.%6$I;
-				)'
-				, 'rl_'||_view_rootname||'_delete' --1
+				DROP TRIGGER IF EXISTS %1$I ON %2$s;
+				CREATE TRIGGER %1$s
+					INSTEAD OF DELETE
+					ON %2$s
+					FOR EACH ROW
+					EXECUTE PROCEDURE %3$s();'
+				, 'tr_'||_view_rootname||'_delete' --1
 				, _view_name::regclass --2
-				, (_child_table->>'table_name')::regclass --3
-				, (_child_table->>'pkey')::text --4
-				, (_parent_table->>'table_name')::regclass --5
-				, (_parent_table->>'pkey')::text --6
+				, _destination_schema||'.ft_'||_parent_table_alias||'_'||_child_table_alias||'_delete' --3
 			);
 		END LOOP;
 
@@ -801,27 +827,51 @@ $BODY$
 
 
 		-- delete function trigger for merge view
-		_sql_cmd := format('
-			CREATE OR REPLACE RULE %1$I AS ON DELETE TO %2$s DO INSTEAD	(',
-			'rl_'||_merge_view_rootname||'_delete', --1
-			_merge_view_name::regclass --2
-		);
-		FOR _child_table_alias IN SELECT json_object_keys(_parent_table->'inherited_by') LOOP
-			_child_table := _parent_table->'inherited_by'->_child_table_alias;
-			_sql_cmd := _sql_cmd || format('
-				DELETE FROM %1$s WHERE %2$I = OLD.%2$I;
-				'
-				, (_child_table->>'table_name')::regclass --1
-				, (_child_table->>'pkey')::text --2
+			RAISE NOTICE '  delete trigger';
+			_sql_cmd := format('
+				CREATE OR REPLACE FUNCTION %1$s()
+					RETURNS trigger AS
+					$$
+						BEGIN'
+				, _destination_schema||'.ft_'||_merge_view_rootname||'_delete' --1
 			);
-		END LOOP;
-		_sql_cmd := _sql_cmd || format('
-			DELETE FROM %1$s WHERE %2$I = OLD.%2$I;)'
-			, (_parent_table->>'table_name')::regclass --1
-			, (_parent_table->>'pkey')::text --2
-		);
-		EXECUTE _sql_cmd;
-
+			FOR _child_table_alias IN SELECT json_object_keys(_parent_table->'inherited_by') LOOP
+				_child_table := _parent_table->'inherited_by'->_child_table_alias;
+				_sql_cmd := _sql_cmd || format('
+							DELETE FROM %1$s WHERE %2$I = OLD.%2$I;'
+					, (_child_table->>'table_name')::regclass --1
+					, (_child_table->>'pkey')::text --2
+				);
+			END LOOP;
+			IF (_child_table->>'custom_parent_delete')::text IS NOT NULL THEN
+				_sql_cmd := _sql_cmd ||  format('
+							%1$s'
+					, (_child_table->>'custom_parent_delete')::text --1
+				);
+			ELSE
+				_sql_cmd := _sql_cmd ||  format('
+							DELETE FROM %1$s WHERE %2$I = OLD.%2$I;'
+					, (_parent_table->>'table_name')::regclass --1
+					, (_parent_table->>'pkey')::text --2
+				);
+			END IF;
+			_sql_cmd := _sql_cmd || '
+							RETURN NULL;
+						END;
+					$$
+					LANGUAGE plpgsql;';
+			EXECUTE _sql_cmd;
+			EXECUTE format('
+				DROP TRIGGER IF EXISTS %1$I ON %2$s;
+				CREATE TRIGGER %1$s
+					INSTEAD OF DELETE
+					ON %2$s
+					FOR EACH ROW
+					EXECUTE PROCEDURE %3$s();'
+				, 'tr_'||_merge_view_rootname||'_delete' --1
+				, _merge_view_name::regclass --2
+				, _destination_schema||'.ft_'||_merge_view_rootname||'_delete' --3
+			);
 	END;
 $BODY$
 LANGUAGE plpgsql;
