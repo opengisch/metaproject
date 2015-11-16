@@ -320,10 +320,10 @@ $BODY$
 				, (_child_table->>'table_name')::regclass --2
 				, (_child_table->>'pkey')::text --3
 			);
-			IF (_child_table->>'custom_parent_delete')::text IS NOT NULL THEN
+			IF (_parent_table->>'custom_delete')::text IS NOT NULL THEN
 				_sql_cmd := _sql_cmd ||  format('
 							%1$s'
-					, (_child_table->>'custom_parent_delete')::text --1
+					, (_parent_table->>'custom_delete')::text --1
 				);
 			ELSE
 				_sql_cmd := _sql_cmd ||  format('
@@ -843,10 +843,10 @@ $BODY$
 					, (_child_table->>'pkey')::text --2
 				);
 			END LOOP;
-			IF (_child_table->>'custom_parent_delete')::text IS NOT NULL THEN
+			IF (_parent_table->>'custom_delete')::text IS NOT NULL THEN
 				_sql_cmd := _sql_cmd ||  format('
 							%1$s'
-					, (_child_table->>'custom_parent_delete')::text --1
+					, (_parent_table->>'custom_delete')::text --1
 				);
 			ELSE
 				_sql_cmd := _sql_cmd ||  format('
