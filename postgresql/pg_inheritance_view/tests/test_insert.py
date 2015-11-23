@@ -24,7 +24,7 @@ test_name = "test_insert"
 
 definition = """
 alias: vehicle
-name: vehicle
+table: vehicle
 pkey: id
 pkey_value: nextval('vehicle_id_seq')
 schema: {0}
