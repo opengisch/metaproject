@@ -3,20 +3,6 @@
 
 import psycopg2, psycopg2.extras
 import yaml
-from collections import OrderedDict
-
-#http://stackoverflow.com/questions/5121931/in-python-how-can-you-load-yaml-mappings-as-ordereddicts
-def ordered_load(stream, Loader=yaml.Loader, object_pairs_hook=OrderedDict):
-    class OrderedLoader(Loader):
-        pass
-    def construct_mapping(loader, node):
-        loader.flatten_mapping(node)
-        return object_pairs_hook(loader.construct_pairs(node))
-    OrderedLoader.add_constructor(
-        yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
-        construct_mapping)
-    return yaml.load(stream, OrderedLoader)
-
 
 
 class PGInheritanceView():
@@ -25,9 +11,7 @@ class PGInheritanceView():
 		self.conn = psycopg2.connect("service={0}".format(service))
 		self.cur = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
-		#self.definition = ordered_load(definition, yaml.SafeLoader)
 		self.definition = yaml.load(definition)
-		#print self.definition['children']['element']
 
 		# add alias definition to children to have the same data structure than the top level (parent table)
 		for child in self.definition['children']:
