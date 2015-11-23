@@ -1,9 +1,5 @@
 #!/usr/bin/env python
 
-#import imp
-#import os
-#import sys
-
 import psycopg2
 
 if __name__ == '__main__':
@@ -14,9 +10,6 @@ if __name__ == '__main__':
         from pg_inheritance_view import PGInheritanceView
     else:
         from ..pg_inheritance_view import PGInheritanceView
-
-#from ..pg_inheritance_view import PGInheritanceView
-#pgiv = imp.load_source('', os.path.join(os.path.dirname(__file__), '../../metaproject/postgresql/pg_inheritance_view/pg_inheritance_view.py'))
 
 pg_service = "pg_test"
 test_name = "test_insert"
@@ -67,13 +60,13 @@ cur.execute( "INSERT INTO {0}.vw_vehicle_all ( vehicle_type, model_name, fk_bike
 cur.execute( "INSERT INTO {0}.vw_vehicle_all ( vehicle_type, model_name, fk_bike_brand, year, top_speed) VALUES ('bike','R1200GS', 1, 2004, 208 );".format(test_name))
 
 #  update */
-cur.execute( "UPDATE vw_vehicle_all SET top_speed = 256 WHERE model_name = '308 GTS';".format(test_name))
+cur.execute( "UPDATE {0}.vw_vehicle_all SET top_speed = 256 WHERE model_name = '308 GTS';".format(test_name))
 
 #  delete */
-cur.execute( "DELETE FROM vw_vehicle_all WHERE model_name = 'R12';".format(test_name))
+cur.execute( "DELETE FROM {0}.vw_vehicle_all WHERE model_name = 'R12';".format(test_name))
 
 #  select */
 # SELECT * FROM vw_vehicle_all;
 
 #  switching allow_type_change to false whould raise an error here */
-cur.execute( "UPDATE vw_vehicle_all SET vehicle_type = 'bike' WHERE model_name = 'DB5';".format(test_name))
+cur.execute( "UPDATE {0}.vw_vehicle_all SET vehicle_type = 'bike' WHERE model_name = 'DB5';".format(test_name))

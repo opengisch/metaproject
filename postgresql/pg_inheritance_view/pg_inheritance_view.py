@@ -188,8 +188,8 @@ class PGInheritanceView():
 			self.definition['pkey']
 			)
 		for col in child_columns:
-			col_alter_write = self.column_alter_write(child, col)
-			col_remap = self.column_remap(child, col)
+			col_alter_write = self.column_alter_write(self.definition['children'][child], col)
+			col_remap = self.column_remap(self.definition['children'][child], col)
 			if not col_remap:
 					col_remap = col
 			sql += "\n\t\t\t, "
@@ -358,11 +358,11 @@ class PGInheritanceView():
 				for column_alias in self.definition['merge_view']['merge_columns']:
 					for table_alias in self.definition['merge_view']['merge_columns'][column_alias]:
 						if table_alias == child:
-							child_columns.remove(column_alias)
+							child_columns.remove(self.definition['merge_view']['merge_columns'][column_alias][child])
 			# add columns
 			for col in child_columns:
-				col_alter_read = self.column_alter_read(child, col)
-				col_remap = self.column_remap(child, col)
+				col_alter_read = self.column_alter_read(self.definition['children'][child], col)
+				col_remap = self.column_remap(self.definition['children'][child], col)
 				sql += "\n\t\t, "
 				if col_alter_read:
 					sql += "{0}({1}.{2})".format(col_alter_read, child, col)
@@ -471,7 +471,7 @@ class PGInheritanceView():
 		for child in self.definition['children']:
 			child_columns = self.columns(self.definition['children'][child])
 
-			sql += "\n\t\tWHEN NEW.{0}_type::{1}.{0} = '{2}'::{1}.{2}\n\t\t\tTHEN INSERT INTO {3} (\n\t\t\t\t{4} {5}\n\t\t\t) VALUES (\n\t\t\t\tNEW.{6}".format(
+			sql += "\n\t\tWHEN NEW.{0}_type::{1}.{0}_type = '{2}'::{1}.{0}_type\n\t\t\tTHEN INSERT INTO {3} (\n\t\t\t\t{4} {5}\n\t\t\t) VALUES (\n\t\t\t\tNEW.{6}".format(
 				self.definition['alias'],
 				self.definition['schema'],
 				child,
@@ -482,8 +482,8 @@ class PGInheritanceView():
 				)
 
 			for col in child_columns:
-				col_alter_write = self.column_alter_write(child, col)
-				col_remap = self.column_remap(child, col)
+				col_alter_write = self.column_alter_write(self.definition['children'][child], col)
+				col_remap = self.column_remap(self.definition['children'][child], col)
 				if not col_remap:
 					col_remap = col
 					# replace remapped column by merged column alias if exists
@@ -581,8 +581,8 @@ class PGInheritanceView():
 					self.definition['pkey']
 					)
 				for col in child_columns:
-					col_alter_write = self.column_alter_write(child, col)
-					col_remap = self.column_remap(child, col)
+					col_alter_write = self.column_alter_write(self.definition['children'][child], col)
+					col_remap = self.column_remap(self.definition['children'][child], col)
 					if not col_remap:
 						col_remap = col
 						# replace remapped column by merged column alias if exists
@@ -612,7 +612,7 @@ class PGInheritanceView():
 		sql += "\n\tCASE"
 		for child in self.definition['children']:
 			child_columns = self.columns(self.definition['children'][child])
-			sql += "\n\tWHEN NEW.{0}_type::{1}.{0} = '{2}'::{1}.{2}\n\t\tTHEN UPDATE {3} SET \n\t\t\t{4} = {5}".format(
+			sql += "\n\tWHEN NEW.{0}_type::{1}.{0}_type = '{2}'::{1}.{0}_type\n\t\tTHEN UPDATE {3} SET \n\t\t\t{4} = {5}".format(
 				self.definition['alias'],
 				self.definition['schema'],
 				child,
@@ -621,8 +621,8 @@ class PGInheritanceView():
 				self.definition['pkey']				
 				)
 			for col in child_columns:
-				col_alter_write = self.column_alter_write(child, col)
-				col_remap = self.column_remap(child, col)
+				col_alter_write = self.column_alter_write(self.definition['children'][child], col)
+				col_remap = self.column_remap(self.definition['children'][child], col)
 				if not col_remap:
 					col_remap = col
 					# replace remapped column by merged column alias if exists
@@ -673,7 +673,7 @@ class PGInheritanceView():
 		
 		sql += "\n\tCASE"
 		for child in self.definition['children']:
-			sql += "\n\t\tWHEN NEW.{0}_type::{1}.{0} = '{2}'::{1}.{2} THEN".format(
+			sql += "\n\t\tWHEN NEW.{0}_type::{1}.{0}_type = '{2}'::{1}.{0}_type THEN".format(
 				self.definition['alias'],
 				self.definition['schema'],
 				child		
