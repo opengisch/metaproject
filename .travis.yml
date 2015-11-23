@@ -13,6 +13,7 @@ install:
 before_script: 
   - printf "[pg_test]\nhost=localhost\ndbname=pg_test\nuser=postgres" > ~/.pg_service.conf
   - psql -c 'CREATE DATABASE pg_test;' -U postgres
+  - export PGSERVICE=pg_test
   - psql -v ON_ERROR_STOP=on -f $TRAVIS_BUILD_DIR/postgresql/pg_inheritance_view/tests/data_sample.sql
   
 script: $TRAVIS_BUILD_DIR/postgresql/pg_inheritance_view/tests/test_insert.py
