@@ -647,7 +647,7 @@ class PGInheritanceView():
 		sql += "\n\t$$"
 		sql += "\n\tLANGUAGE plpgsql;\n"
 
-		# create trigger
+		# update trigger
 		sql += "DROP TRIGGER IF EXISTS {0} ON {0}.{1};\n".format(trigger, self.definition['schema'], self.definition['merge_view']['name'])
 		sql += "CREATE TRIGGER {0}\n".format(trigger)
 		sql += "\tINSTEAD OF UPDATE\n"
@@ -692,10 +692,10 @@ class PGInheritanceView():
 		sql += "\t$$\n"
 		sql += "\tLANGUAGE plpgsql;\n\n"
 
-		# create trigger
+		# delete trigger
 		sql += "DROP TRIGGER IF EXISTS {0} ON {1}.{2};\n".format(trigger, self.definition['schema'], self.definition['merge_view']['name'])
 		sql += "CREATE TRIGGER {0}\n".format(trigger)
-		sql += "\tINSTEAD OF UPDATE\n"
+		sql += "\tINSTEAD OF DELETE\n"
 		sql += "\tON {0}.{1}\n".format(self.definition['schema'], self.definition['merge_view']['name'])
 		sql += "\tFOR EACH ROW\n"
 		sql += "\tEXECUTE PROCEDURE {0}();\n\n".format(functrigger)
