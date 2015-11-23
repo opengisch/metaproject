@@ -8,7 +8,7 @@ addons:
 
 install:
   - pip install psycopg2 --quiet
-  - pip install psyyaml --quiet
+  - pip install pyyaml --quiet
 
 before_script: 
   - printf "[pg_test]\nhost=localhost\ndbname=pg_test\nuser=postgres" > ~/.pg_service.conf
