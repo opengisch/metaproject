@@ -6,6 +6,9 @@ sudo: false
 addons:
   postgresql: "9.4"
 
+install:
+  - pip install psycopg2 --quiet
+
 before_script: 
   - printf "[pg_test]\nhost=localhost\ndbname=pg_test\nuser=postgres" > ~/.pg_service.conf
   - psql -c 'CREATE DATABASE pg_test;' -U postgres
