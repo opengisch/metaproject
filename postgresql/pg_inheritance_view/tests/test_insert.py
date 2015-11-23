@@ -23,24 +23,24 @@ test_name = "test_insert"
 
 
 definition = """
-vehicle:
-table_name: vehicle
+alias: vehicle
+name: vehicle
 pkey: id
 pkey_value: nextval('vehicle_id_seq')
 schema: {0}
-inherited_by:
+children:
   car:
-    table_name: car
+    table: car
     pkey: id
     remap:
       fk_brand: fk_car_brand
   bike:
-    table_name: motorbike
+    table: motorbike
     pkey: id
     remap:
       fk_brand: fk_bike_brand
 merge_view:
-  view_name: vw_vehicle_all
+  name: vw_vehicle_all
   additional_columns:
     for_sale: year_end IS NULL OR year_end >= extract(year from now())
   allow_type_change: true
