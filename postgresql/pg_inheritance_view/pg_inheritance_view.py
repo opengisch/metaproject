@@ -20,8 +20,9 @@ class PGInheritanceView():
 		# defines if a item can be inserted in the parent table only (not any sub-type). Default: true.
 		self.allow_parent_only = self.definition['allow_parent_only'] if 'allow_parent_only' in self.definition else True
 		# defines if switching between sub-type is allowed in the merge_view. Default: false
-		self.allow_type_change = self.definition['allow_type_change'] if 'allow_type_change' in self.definition else False
-
+		self.allow_type_change = False
+		if 'merge_view' in self.definition and 'allow_type_change' in self.definition['merge_view']:
+			self.allow_type_change = self.definition['merge_view']['allow_type_change']
 
 	def columns(self, element):
 		self.cur.execute("SELECT attname FROM pg_attribute WHERE attrelid = '{0}'::regclass AND attnum > 0 ORDER BY attnum ASC".format(element['table']))
@@ -566,14 +567,14 @@ class PGInheritanceView():
 			sql += "\n\t\t-- delete old sub type"
 			sql += "\n\t\tCASE"
 			for child in self.definition['children']:
-				sql += "\n\t\t\tWHEN OLD.{0}_type::{1}.{0}_type = {2}::{1}.{0}_type".format(self.definition['alias'], self.definition['schema'], child)
+				sql += "\n\t\t\tWHEN OLD.{0}_type::{1}.{0}_type = '{2}'::{1}.{0}_type".format(self.definition['alias'], self.definition['schema'], child)
 				sql += "\n\t\t\t\tTHEN DELETE FROM {0} WHERE {1} = OLD.{1};".format(self.definition['children'][child]['table'], self.definition['children'][child]['pkey'])
 			sql += "\n\t\tEND CASE;"
 			sql += "\n\t\t-- insert new sub type"
 			sql += "\n\t\tCASE"
 			for child in self.definition['children']:
 				child_columns = self.columns(self.definition['children'][child])
-				sql += "\n\t\t\tWHEN NEW.{0}_type::{1}.{0}_type = {2}::{1}.{0}_type".format(self.definition['alias'], self.definition['schema'], child)
+				sql += "\n\t\t\tWHEN NEW.{0}_type::{1}.{0}_type = '{2}'::{1}.{0}_type".format(self.definition['alias'], self.definition['schema'], child)
 				sql += "\n\t\t\t\tTHEN INSERT INTO {0} (\n\t\t\t\t\t\t{1} {2} \n\t\t\t\t\t) VALUES (\n\t\t\t\t\t\tOLD.{3}".format(
 					self.definition['children'][child]['table'],
 					self.definition['children'][child]['pkey'],
@@ -618,7 +619,7 @@ class PGInheritanceView():
 				child,
 				self.definition['children'][child]['table'],
 				self.definition['children'][child]['pkey'],
-				self.definition['pkey']				
+				self.definition['pkey']
 				)
 			for col in child_columns:
 				col_alter_write = self.column_alter_write(self.definition['children'][child], col)
@@ -665,24 +666,24 @@ class PGInheritanceView():
 		trigger = "tr_{0}_delete".format(self.definition['merge_view']['name'])
 
 		sql = ''
-		
+
 		sql =  "\nCREATE OR REPLACE FUNCTION {0}()".format(functrigger)
 		sql += "\n\tRETURNS trigger AS"
 		sql += "\n\t$$"
 		sql += "\n\tBEGIN"
-		
+
 		sql += "\n\tCASE"
 		for child in self.definition['children']:
-			sql += "\n\t\tWHEN NEW.{0}_type::{1}.{0}_type = '{2}'::{1}.{0}_type THEN".format(
+			sql += "\n\t\tWHEN OLD.{0}_type::{1}.{0}_type = '{2}'::{1}.{0}_type THEN".format(
 				self.definition['alias'],
 				self.definition['schema'],
-				child		
+				child
 				)
 			if "custom_delete" in self.definition['children'][child]:
 				sql += "\n\t\t\t{0};".format(self.definition['children'][child]['custom_delete'])
 			else:
 				sql += "\n\t\t\tDELETE FROM {0} WHERE {1} = OLD.{1};".format(self.definition['children'][child]['table'], self.definition['children'][child]['pkey'])
-		sql += "\n\tEND CASE;"		
+		sql += "\n\tEND CASE;"
 		if "custom_delete" in self.definition:
 			sql += "\n\t{0};".format(self.definition['custom_delete'])
 		else:
