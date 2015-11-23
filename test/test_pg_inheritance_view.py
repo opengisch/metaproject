@@ -15,35 +15,7 @@ if __name__ == '__main__':
 
 pg_service = "pg_test"
 
-definition = """
-alias: vehicle
-table: vehicle
-pkey: id
-pkey_value: nextval('vehicle_id_seq')
-schema: {0}
-children:
-  car:
-    table: car
-    pkey: id
-    remap:
-      fk_brand: fk_car_brand
-  bike:
-    table: motorbike
-    pkey: id
-    remap:
-      fk_brand: fk_bike_brand
-merge_view:
-  name: vw_vehicle_all
-  additional_columns:
-    for_sale: year_end IS NULL OR year_end >= extract(year from now())
-  allow_type_change: true
-  merge_columns:
-    top_speed:
-      car: max_speed
-      bike: max_speed
-""".format(test_name)
-
-class TestTriggers(unittest.TestCase):
+class TestPgInheritanceView(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
@@ -53,10 +25,38 @@ class TestTriggers(unittest.TestCase):
     def setUpClass(cls):
         cls.conn = psycopg2.connect("service={0}".format(pg_service))
 
-    def test_insert(self):
+    def test_pg_inheritance_view(self):
         test_name = "test_insert"
 
-        cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        definition = """
+        alias: vehicle
+        table: vehicle
+        pkey: id
+        pkey_value: nextval('vehicle_id_seq')
+        schema: {0}
+        children:
+          car:
+            table: car
+            pkey: id
+            remap:
+              fk_brand: fk_car_brand
+          bike:
+            table: motorbike
+            pkey: id
+            remap:
+              fk_brand: fk_bike_brand
+        merge_view:
+          name: vw_vehicle_all
+          additional_columns:
+            for_sale: year_end IS NULL OR year_end >= extract(year from now())
+          allow_type_change: true
+          merge_columns:
+            top_speed:
+              car: max_speed
+              bike: max_speed
+        """.format(test_name)
+
+        cur = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
         cur.execute( "CREATE SCHEMA {0};".format(test_name) )
 
