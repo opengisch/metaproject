@@ -50,7 +50,7 @@ merge_view:
       bike: max_speed
 """.format(test_name)
 
-conn = psycopg2.connect("service={0}".format(service))
+conn = psycopg2.connect("service={0}".format(pg_service))
 cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
 cur.execute( "CREATE SCHEMA {0};".format(test_name) )
