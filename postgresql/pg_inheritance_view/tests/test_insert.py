@@ -1,10 +1,19 @@
 #!/usr/bin/env python
 
-import imp
-import os
-import sys
+#import imp
+#import os
+#import sys
 
-from ..pg_inheritance_view import PGInheritanceView
+if __name__ == '__main__':
+    if __package__ is None:
+        import sys
+        from os import path
+        sys.path.append( path.dirname( path.dirname( path.abspath(__file__) ) ) )
+        from pg_inheritance_view import PGInheritanceView
+    else:
+        from ..pg_inheritance_view import PGInheritanceView
+
+#from ..pg_inheritance_view import PGInheritanceView
 #pgiv = imp.load_source('', os.path.join(os.path.dirname(__file__), '../../metaproject/postgresql/pg_inheritance_view/pg_inheritance_view.py'))
 
 pg_service = "pg_test"
@@ -44,7 +53,7 @@ cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
 cur.execute( "CREATE SCHEMA {0};".format(test_name) )
 		
-cur.execute( pgiv.PGInheritanceView(pg_service, definition).sql_all() )
+cur.execute( PGInheritanceView(pg_service, definition).sql_all() )
 
 #  insert through the view between parent table and child table */
 cur.execute( "INSERT INTO {0}.vw_vehicle_car ( model_name, fk_car_brand, year, year_end, max_speed ) VALUES ('DB5', 1, 1963, 1965, 230); ".format(test_name))
