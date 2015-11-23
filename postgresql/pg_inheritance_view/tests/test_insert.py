@@ -4,6 +4,8 @@
 #import os
 #import sys
 
+import psycopg2
+
 if __name__ == '__main__':
     if __package__ is None:
         import sys
