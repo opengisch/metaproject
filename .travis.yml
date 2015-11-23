@@ -16,5 +16,5 @@ before_script:
   - export PGSERVICE=pg_test
 
 script:
-    - psql -v ON_ERROR_STOP=on -f $TRAVIS_BUILD_DIR/postgresql/pg_inheritance_view/tests/data_sample.sql
+    - psql -v ON_ERROR_STOP=on -f $TRAVIS_BUILD_DIR/postgresql/pg_inheritance_view/data_sample.sql
     - nosetests
