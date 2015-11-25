@@ -68,7 +68,7 @@ class PGInheritanceView():
 		return sql
 
 	def sql_type(self):
-		sql = "DROP TYPE {0}.{1}_type;".format(self.definition['schema'], self.definition['alias'])
+		sql = "DROP TYPE IF EXISTS {0}.{1}_type;".format(self.definition['schema'], self.definition['alias'])
 		sql += "\nCREATE TYPE {0}.{1}_type AS ENUM ({2} {3} );\n\n".format(
 			self.definition['schema'],
 			self.definition['alias'],
