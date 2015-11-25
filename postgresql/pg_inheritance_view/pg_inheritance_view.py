@@ -68,7 +68,8 @@ class PGInheritanceView():
 		return sql
 
 	def sql_type(self):
-		sql = "CREATE TYPE {0}.{1}_type AS ENUM ({2} {3} );\n\n".format(
+		sql = "DROP TYPE {0}.{1}_type;".format(self.definition['schema'], self.definition['alias'])
+		sql += "\nCREATE TYPE {0}.{1}_type AS ENUM ({2} {3} );\n\n".format(
 			self.definition['schema'],
 			self.definition['alias'],
 			" '{0}',".format(self.definition['alias']) if self.allow_parent_only is True else "",
