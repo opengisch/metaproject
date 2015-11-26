@@ -257,7 +257,7 @@ class PGInheritanceView():
 		# create trigger
 		sql += "DROP TRIGGER IF EXISTS {0} ON {1};\n".format(trigger, self.join_view_name(child))
 		sql += "CREATE TRIGGER {0}\n".format(trigger)
-		sql += "\tINSTEAD OF UPDATE\n"
+		sql += "\tINSTEAD OF DELETE\n"
 		sql += "\tON {0}\n".format(self.join_view_name(child))
 		sql += "\tFOR EACH ROW\n"
 		sql += "\tEXECUTE PROCEDURE {0}();\n\n".format(functrigger)
