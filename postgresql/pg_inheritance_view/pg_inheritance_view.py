@@ -154,7 +154,7 @@ class PGInheritanceView():
 				col_alter_write = self.column_alter_write(self.definition, col)
 				col_remap = self.column_remap(self.definition, col)
 
-				sql += "\t\t\t\t{0} = {1}{2}{3},\n".format(
+				sql += "\t\t\t\t{0} = {1}NEW.{2}{3},\n".format(
 					col,
 					'{0}('.format(col_alter_write) if col_alter_write else '',
 					col_remap if col_remap else col,
@@ -240,7 +240,7 @@ class PGInheritanceView():
 					if not col_remap:
 						col_remap = col
 
-					sql += "\n\t\t\t{0} = {1}{2}{3},".format(
+					sql += "\n\t\t\t{0} = {1}NEW.{2}{3},".format(
 						col,
 						'{0}('.format(col_alter_write) if col_alter_write else '',
 						col_remap,
@@ -439,7 +439,7 @@ class PGInheritanceView():
 				if not col_remap:
 					col_remap = col
 
-				sql += "\t\t\t\t{0} = {1}{2}{3},\n".format(
+				sql += "\t\t\t\t{0} = {1}NEW.{2}{3},\n".format(
 					col,
 					'{0}('.format(col_alter_write) if col_alter_write else '',
 					col_remap,
@@ -545,7 +545,7 @@ class PGInheritanceView():
 				if not col_remap:
 					col_remap = col
 
-				sql += "\n\t\t\t{0} = {1}{2}{3},".format(
+				sql += "\n\t\t\t{0} = {1}NEW.{2}{3},".format(
 					col,
 					'{0}('.format(col_alter_write) if col_alter_write else '',
 					col_remap,
