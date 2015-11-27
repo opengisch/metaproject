@@ -614,33 +614,36 @@ class PGInheritanceView():
 		sql += "\n\tCASE"
 		for child in self.definition['children']:
 			child_columns = self.columns(self.definition['children'][child])
-			sql += "\n\tWHEN NEW.{0}_type::{1}.{0}_type = '{2}'::{1}.{0}_type\n\t\tTHEN UPDATE {3} SET\n\t\t\t".format(
+			sql += "\n\tWHEN NEW.{0}_type::{1}.{0}_type = '{2}'::{1}.{0}_type\n\t\tTHEN ".format(
 				self.definition['alias'],
 				self.definition['schema'],
-				child,
-				self.definition['children'][child]['table']
+				child
 				)
-			for col in child_columns:
-				col_alter_write = self.column_alter_write(self.definition['children'][child], col)
-				col_remap = self.column_remap(self.definition['children'][child], col)
-				if not col_remap:
-					col_remap = col
-					# replace remapped column by merged column alias if exists
-					if 'merge_columns' in self.definition['merge_view']:
-						for column_alias in self.definition['merge_view']['merge_columns']:
-							for table_alias in self.definition['merge_view']['merge_columns'][column_alias]:
-								if table_alias == child:
-									if col_remap == self.definition['merge_view']['merge_columns'][column_alias][table_alias]:
-										col_remap = column_alias
-				sql += "{0} = ".format(col)
-				if col_alter_write:
-					sql += "{0}( ".format(col_alter_write)
-				sql += 'NEW.{0}'.format(col_remap)
-				if col_alter_write:
-					sql += " )"
-				sql += "\n\t\t\t, "
-			sql = sql[:-2]
-			sql += "\n\tWHERE {0} = OLD.{1};".format(self.definition['children'][child]['pkey'], self.definition['pkey'])
+			if len(child_columns) == 0:
+				sql += "\n\t\tNULL;"
+			else:
+				sql += "UPDATE {0} SET\n\t\t\t".format(self.definition['children'][child]['table'])
+				for col in child_columns:
+					col_alter_write = self.column_alter_write(self.definition['children'][child], col)
+					col_remap = self.column_remap(self.definition['children'][child], col)
+					if not col_remap:
+						col_remap = col
+						# replace remapped column by merged column alias if exists
+						if 'merge_columns' in self.definition['merge_view']:
+							for column_alias in self.definition['merge_view']['merge_columns']:
+								for table_alias in self.definition['merge_view']['merge_columns'][column_alias]:
+									if table_alias == child:
+										if col_remap == self.definition['merge_view']['merge_columns'][column_alias][table_alias]:
+											col_remap = column_alias
+					sql += "{0} = ".format(col)
+					if col_alter_write:
+						sql += "{0}( ".format(col_alter_write)
+					sql += 'NEW.{0}'.format(col_remap)
+					if col_alter_write:
+						sql += " )"
+					sql += "\n\t\t\t, "
+				sql = sql[:-3]
+				sql += "WHERE {0} = OLD.{1};".format(self.definition['children'][child]['pkey'], self.definition['pkey'])
 		sql += "\n\tEND CASE;\n"
 
 		sql += "\n\tRETURN NEW;"
