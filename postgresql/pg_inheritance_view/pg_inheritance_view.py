@@ -247,7 +247,7 @@ class PGInheritanceView():
 						')' if col_alter_write else ''
 						)
 				sql = sql[:-1] # extra comma
-				sql += "\n\t\tWHERE {0} = NEW.{0};\n".format(element['pkey'])
+				sql += "\n\t\tWHERE {0} = OLD.{0};\n".format(element['pkey'])
 
 		sql += "\t\tRETURN NEW;\n"
 		sql += "\tEND;\n"
@@ -552,7 +552,7 @@ class PGInheritanceView():
 					')' if col_alter_write else ''
 					)
 			sql = sql[:-1] # extra comma
-			sql += "\n\t\tWHERE {0} = NEW.{0};".format(self.definition['pkey'])
+			sql += "\n\t\tWHERE {0} = OLD.{0};".format(self.definition['pkey'])
 
 		# do not allow parent only insert
 		if not self.allow_parent_only:
@@ -614,13 +614,11 @@ class PGInheritanceView():
 		sql += "\n\tCASE"
 		for child in self.definition['children']:
 			child_columns = self.columns(self.definition['children'][child])
-			sql += "\n\tWHEN NEW.{0}_type::{1}.{0}_type = '{2}'::{1}.{0}_type\n\t\tTHEN UPDATE {3} SET \n\t\t\t{4} = {5}".format(
+			sql += "\n\tWHEN NEW.{0}_type::{1}.{0}_type = '{2}'::{1}.{0}_type\n\t\tTHEN UPDATE {3} SET".format(
 				self.definition['alias'],
 				self.definition['schema'],
 				child,
-				self.definition['children'][child]['table'],
-				self.definition['children'][child]['pkey'],
-				self.definition['pkey']
+				self.definition['children'][child]['table']
 				)
 			for col in child_columns:
 				col_alter_write = self.column_alter_write(self.definition['children'][child], col)
@@ -640,9 +638,8 @@ class PGInheritanceView():
 				sql += 'NEW.{0}'.format(col_remap)
 				if col_alter_write:
 					sql += " )"
-			sql += ";"
+			sql += "\n\tWHERE {0} = OLD.{1};".format(self.definition['children'][child]['pkey'], self.definition['pkey'])
 		sql += "\n\tEND CASE;\n"
-
 
 		sql += "\n\tRETURN NEW;"
 		sql += "\n\tEND;"
