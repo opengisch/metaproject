@@ -614,7 +614,7 @@ class PGInheritanceView():
 		sql += "\n\tCASE"
 		for child in self.definition['children']:
 			child_columns = self.columns(self.definition['children'][child])
-			sql += "\n\tWHEN NEW.{0}_type::{1}.{0}_type = '{2}'::{1}.{0}_type\n\t\tTHEN UPDATE {3} SET".format(
+			sql += "\n\tWHEN NEW.{0}_type::{1}.{0}_type = '{2}'::{1}.{0}_type\n\t\tTHEN UPDATE {3} SET\n\t\t\t".format(
 				self.definition['alias'],
 				self.definition['schema'],
 				child,
@@ -632,12 +632,14 @@ class PGInheritanceView():
 								if table_alias == child:
 									if col_remap == self.definition['merge_view']['merge_columns'][column_alias][table_alias]:
 										col_remap = column_alias
-				sql += "\n\t\t\t, {0} = ".format(col)
+				sql += "{0} = ".format(col)
 				if col_alter_write:
 					sql += "{0}( ".format(col_alter_write)
 				sql += 'NEW.{0}'.format(col_remap)
 				if col_alter_write:
 					sql += " )"
+				sql += "\n\t\t\t, "
+			sql = sql[:-2]
 			sql += "\n\tWHERE {0} = OLD.{1};".format(self.definition['children'][child]['pkey'], self.definition['pkey'])
 		sql += "\n\tEND CASE;\n"
 
