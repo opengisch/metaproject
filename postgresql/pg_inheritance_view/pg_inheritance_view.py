@@ -25,7 +25,7 @@ class PGInheritanceView():
 			self.allow_type_change = self.definition['merge_view']['allow_type_change']
 
 	def columns(self, element):
-		self.cur.execute("SELECT attname FROM pg_attribute WHERE attrelid = '{0}'::regclass AND attnum > 0 ORDER BY attnum ASC".format(element['table']))
+		self.cur.execute("SELECT attname FROM pg_attribute WHERE attrelid = '{0}'::regclass AND attisdropped IS NOT TRUE AND attnum > 0 ORDER BY attnum ASC".format(element['table']))
 		pg_fields = self.cur.fetchall()
 		pg_fields = [field[0] for field in pg_fields]
 		pg_fields.remove(element['pkey'])
