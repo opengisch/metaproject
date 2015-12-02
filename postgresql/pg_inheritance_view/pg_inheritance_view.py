@@ -122,8 +122,12 @@ class PGInheritanceView():
 		sql += "\t$$\n"
 		sql += "\tBEGIN\n"
 
+		# optional code addition
+		if 'trigger_pre' in self.definition:
+			sql += self.definition['trigger_pre'] + '\n'
+
 		# insert into parent
-		if 'pkey_value_create_entry' in self.definition and self.definition['pkey_value_create_entry']:
+		if 'pkey_value_create_entry' in self.definition and self.definition['pkey_value_create_entry'] is True:
 			# Allow to use function to create entry
 			# the function is defined by pkey_value
 			# if exists, pkey_value is triggered and will return an ID
@@ -148,20 +152,21 @@ class PGInheritanceView():
 				self.definition['pkey']
 				)
 			sql += "\t\tEND IF;\n"
-			sql += "\t\t-- Now update the existing or created feature in parent table\n"
-			sql += "\t\tUPDATE {0} SET\n".format(self.definition['table'])
-			for col in parent_columns:
-				col_alter_write = self.column_alter_write(self.definition, col)
-				col_remap = self.column_remap(self.definition, col)
+			if 'pkey_value_create_entry_update' in self.definition and self.definition['pkey_value_create_entry_update'] is True:
+				sql += "\t\t-- Now update the existing or created feature in parent table\n"
+				sql += "\t\tUPDATE {0} SET\n".format(self.definition['table'])
+				for col in parent_columns:
+					col_alter_write = self.column_alter_write(self.definition, col)
+					col_remap = self.column_remap(self.definition, col)
 
-				sql += "\t\t\t\t{0} = {1}NEW.{2}{3},\n".format(
-					col,
-					'{0}('.format(col_alter_write) if col_alter_write else '',
-					col_remap if col_remap else col,
-					')' if col_alter_write else ''
-					)
-			sql = sql[:-2]+'\n'
-			sql += "\t\t\tWHERE {0} = NEW.{0};\n".format(self.definition['pkey'])
+					sql += "\t\t\t\t{0} = {1}NEW.{2}{3},\n".format(
+						col,
+						'{0}('.format(col_alter_write) if col_alter_write else '',
+						col_remap if col_remap else col,
+						')' if col_alter_write else ''
+						)
+				sql = sql[:-2]+'\n'
+				sql += "\t\t\tWHERE {0} = NEW.{0};\n".format(self.definition['pkey'])
 		else:
 			sql += "\t\tINSERT INTO {0} (\n\t\t\t{1}\n\t\t\t{2}\n\t\t) VALUES (\n\t\t\t{3} ".format(
 				self.definition['table'],
@@ -229,6 +234,10 @@ class PGInheritanceView():
 		sql += "\n\tRETURNS trigger AS"
 		sql += "\n\t$$"
 		sql += "\n\tBEGIN"
+
+		# optional code addition
+		if 'trigger_pre' in self.definition:
+			sql += self.definition['trigger_pre'] + '\n'
 
 		for element in (self.definition, self.definition['children'][child]):
 			cols = self.columns(element)
@@ -405,8 +414,12 @@ class PGInheritanceView():
 		sql += "\t$$\n"
 		sql += "\tBEGIN\n"
 
+		# optional code addition
+		if 'trigger_pre' in self.definition:
+			sql += self.definition['trigger_pre'] + '\n'
+
 		# insert into parent
-		if 'pkey_value_create_entry' in self.definition and self.definition['pkey_value_create_entry']:
+		if 'pkey_value_create_entry' in self.definition and self.definition['pkey_value_create_entry'] is True:
 			# Allow to use function to create entry
 			# the function is defined by pkey_value
 			# if exists, pkey_value is triggered and will return an ID
@@ -431,22 +444,23 @@ class PGInheritanceView():
 				self.definition['pkey']
 				)
 			sql += "\t\tEND IF;\n"
-			sql += "\t\t-- Now update the existing or created feature in parent table\n"
-			sql += "\t\tUPDATE {0} SET\n".format(self.definition['table'])
-			for col in parent_columns:
-				col_alter_write = self.column_alter_write(self.definition, col)
-				col_remap = self.column_remap(self.definition, col)
-				if not col_remap:
-					col_remap = col
+			if 'pkey_value_create_entry' in self.definition and self.definition['pkey_value_create_entry'] is True:
+				sql += "\t\t-- Now update the existing or created feature in parent table\n"
+				sql += "\t\tUPDATE {0} SET\n".format(self.definition['table'])
+				for col in parent_columns:
+					col_alter_write = self.column_alter_write(self.definition, col)
+					col_remap = self.column_remap(self.definition, col)
+					if not col_remap:
+						col_remap = col
 
-				sql += "\t\t\t\t{0} = {1}NEW.{2}{3},\n".format(
-					col,
-					'{0}('.format(col_alter_write) if col_alter_write else '',
-					col_remap,
-					')' if col_alter_write else ''
-					)
-			sql = sql[:-2]+'\n'
-			sql += "\t\t\tWHERE {0} = NEW.{0};\n".format(self.definition['pkey'])
+					sql += "\t\t\t\t{0} = {1}NEW.{2}{3},\n".format(
+						col,
+						'{0}('.format(col_alter_write) if col_alter_write else '',
+						col_remap,
+						')' if col_alter_write else ''
+						)
+				sql = sql[:-2]+'\n'
+				sql += "\t\t\tWHERE {0} = NEW.{0};\n".format(self.definition['pkey'])
 		# standard insert
 		else:
 			sql += "\t\tINSERT INTO {0} (\n\t\t\t{1}\n\t\t\t{2}\n\t\t) VALUES (\n\t\t\t{3} ".format(
@@ -534,6 +548,10 @@ class PGInheritanceView():
 		sql += "\n\tRETURNS trigger AS"
 		sql += "\n\t$$"
 		sql += "\n\tBEGIN"
+
+		# optional code addition
+		if 'trigger_pre' in self.definition:
+			sql += self.definition['trigger_pre'] + '\n'
 
 		# parent columns
 		cols = self.columns(self.definition)
