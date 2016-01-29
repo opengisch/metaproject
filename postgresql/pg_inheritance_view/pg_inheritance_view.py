@@ -89,7 +89,7 @@ class PGInheritanceView():
 				col_remap = self.column_remap(element, col)
 				sql += "\n\t\t, "
 				if col_alter_read:
-					sql += "{0}({1}.{2})".format(col_alter_read, element['alias'], col)
+					sql += "{0}".format(col_alter_read)
 					if not col_remap:
 						sql += " AS {0}".format(col)
 				else:
@@ -159,12 +159,15 @@ class PGInheritanceView():
 					col_alter_write = self.column_alter_write(self.definition, col)
 					col_remap = self.column_remap(self.definition, col)
 
-					sql += "\t\t\t\t{0} = {1}NEW.{2}{3},\n".format(
-						col,
-						'{0}('.format(col_alter_write) if col_alter_write else '',
-						col_remap if col_remap else col,
-						')' if col_alter_write else ''
-						)
+					sql += "\t\t\t\t{0} = ".format(col)
+					if col_alter_write:
+						sql += '{0}'.format(col_alter_write)
+					elif col_remap:
+						sql += 'NEW.{0}'.format(col_remap)
+					else:
+						sql += 'NEW.{0}'.format(col)
+					sql += ",\n"
+
 				sql = sql[:-2]+'\n'
 				sql += "\t\t\tWHERE {0} = NEW.{0};\n".format(self.definition['pkey'])
 		else:
@@ -177,14 +180,15 @@ class PGInheritanceView():
 			for col in parent_columns:
 				col_alter_write = self.column_alter_write(self.definition, col)
 				col_remap = self.column_remap(self.definition, col)
-				if not col_remap:
-					col_remap = col
+
 				sql += "\n\t\t\t, "
 				if col_alter_write:
-					sql += "{0}( ".format(col_alter_write)
-				sql += 'NEW.{0}'.format(col_remap)
-				if col_alter_write:
-					sql += " )"
+					sql += '{0}'.format(col_alter_write)
+				elif col_remap:
+					sql += 'NEW.{0}'.format(col_remap)
+				else:
+					sql += 'NEW.{0}'.format(col)
+
 			sql += "\n\t\t) RETURNING {0} INTO NEW.{0};\n".format(self.definition['pkey'])
 
 		# insert into child
@@ -197,14 +201,15 @@ class PGInheritanceView():
 		for col in child_columns:
 			col_alter_write = self.column_alter_write(self.definition['children'][child], col)
 			col_remap = self.column_remap(self.definition['children'][child], col)
-			if not col_remap:
-					col_remap = col
+
 			sql += "\n\t\t\t, "
 			if col_alter_write:
-				sql += "{0}( ".format(col_alter_write)
-			sql += 'NEW.{0}'.format(col_remap)
-			if col_alter_write:
-				sql += " )"
+				sql += '{0}'.format(col_alter_write)
+			elif col_remap:
+				sql += 'NEW.{0}'.format(col_remap)
+			else:
+				sql += 'NEW.{0}'.format(col)
+
 		sql += "\n\t\t);\n"
 
 		# end trigger function
@@ -246,15 +251,16 @@ class PGInheritanceView():
 				for col in cols:
 					col_alter_write = self.column_alter_write(element, col)
 					col_remap = self.column_remap(element, col)
-					if not col_remap:
-						col_remap = col
 
-					sql += "\n\t\t\t{0} = {1}NEW.{2}{3},".format(
-						col,
-						'{0}('.format(col_alter_write) if col_alter_write else '',
-						col_remap,
-						')' if col_alter_write else ''
-						)
+					sql += "\n\t\t\t{0} = ".format(col)
+					if col_alter_write:
+						sql += '{0}'.format(col_alter_write)
+					elif col_remap:
+						sql += 'NEW.{0}'.format(col_remap)
+					else:
+						sql += 'NEW.{0}'.format(col)
+					sql += ","
+
 				sql = sql[:-1] # extra comma
 				sql += "\n\t\tWHERE {0} = OLD.{0};\n".format(element['pkey'])
 
@@ -335,11 +341,11 @@ class PGInheritanceView():
 			col_remap = self.column_remap(self.definition, col)
 			sql += "\n\t\t, "
 			if col_alter_read:
-				sql += "{0}({1}.{2})".format(col_alter_read, self.definition['alias'], col)
+				sql += "{0}".format(col_alter_read)
 				if not col_remap:
 					sql += " AS {0}".format(col)
 			else:
-				sql += "{0}.{1}".format(self.definition['alias'],col)
+				sql += "{0}.{1}".format(self.definition['alias'], col)
 			if col_remap:
 				sql += " AS {0}".format(col_remap)
 
@@ -376,11 +382,11 @@ class PGInheritanceView():
 				col_remap = self.column_remap(self.definition['children'][child], col)
 				sql += "\n\t\t, "
 				if col_alter_read:
-					sql += "{0}({1}.{2})".format(col_alter_read, child, col)
+					sql += "{0}".format(col_alter_read)
 					if not col_remap:
 						sql += " AS {0}".format(col)
 				else:
-					sql += "{0}.{1}".format(child,col)
+					sql += "{0}.{1}".format(child, col)
 				if col_remap:
 					sql += " AS {0}".format(col_remap)
 
@@ -453,12 +459,15 @@ class PGInheritanceView():
 					if not col_remap:
 						col_remap = col
 
-					sql += "\t\t\t\t{0} = {1}NEW.{2}{3},\n".format(
-						col,
-						'{0}('.format(col_alter_write) if col_alter_write else '',
-						col_remap,
-						')' if col_alter_write else ''
-						)
+					sql += "\t\t\t\t{0} = ".format(col)
+					if col_alter_write:
+						sql += '{0}'.format(col_alter_write)
+					elif col_remap:
+						sql += 'NEW.{0}'.format(col_remap)
+					else:
+						sql += 'NEW.{0}'.format(col)
+					sql += ",\n"
+
 				sql = sql[:-2]+'\n'
 				sql += "\t\t\tWHERE {0} = NEW.{0};\n".format(self.definition['pkey'])
 		# standard insert
@@ -472,14 +481,15 @@ class PGInheritanceView():
 			for col in parent_columns:
 				col_alter_write = self.column_alter_write(self.definition, col)
 				col_remap = self.column_remap(self.definition, col)
-				if not col_remap:
-					col_remap = col
+
 				sql += "\n\t\t\t, "
 				if col_alter_write:
-					sql += "{0}( ".format(col_alter_write)
-				sql += 'NEW.{0}'.format(col_remap)
-				if col_alter_write:
-					sql += " )"
+					sql += '{0}'.format(col_alter_write)
+				elif col_remap:
+					sql += 'NEW.{0}'.format(col_remap)
+				else:
+					sql += 'NEW.{0}'.format(col)
+
 			sql += "\n\t\t) RETURNING {0} INTO NEW.{0};\n".format(self.definition['pkey'])
 
 		# insert into children
@@ -511,10 +521,9 @@ class PGInheritanceView():
 										col_remap = column_alias
 				sql += "\n\t\t\t\t, "
 				if col_alter_write:
-					sql += "{0}( ".format(col_alter_write)
-				sql += 'NEW.{0}'.format(col_remap)
-				if col_alter_write:
-					sql += " )"
+					sql += "{0}".format(col_alter_write)
+				else:
+					sql += 'NEW.{0}'.format(col_remap)
 			sql += "\n\t\t);\n"
 		sql += "\n\t END CASE;\n"
 
@@ -560,15 +569,16 @@ class PGInheritanceView():
 			for col in cols:
 				col_alter_write = self.column_alter_write(self.definition, col)
 				col_remap = self.column_remap(self.definition, col)
-				if not col_remap:
-					col_remap = col
 
-				sql += "\n\t\t\t{0} = {1}NEW.{2}{3},".format(
-					col,
-					'{0}('.format(col_alter_write) if col_alter_write else '',
-					col_remap,
-					')' if col_alter_write else ''
-					)
+				sql += "\n\t\t\t{0} = ".format(col)
+				if col_alter_write:
+					sql += '{0}'.format(col_alter_write)
+				elif col_remap:
+					sql += 'NEW.{0}'.format(col_remap)
+				else:
+					sql += 'NEW.{0}'.format(col)
+				sql += ","
+
 			sql = sql[:-1] # extra comma
 			sql += "\n\t\tWHERE {0} = OLD.{0};".format(self.definition['pkey'])
 
@@ -614,10 +624,9 @@ class PGInheritanceView():
 											col_remap = column_alias
 					sql += "\n\t\t\t\t\t\t, "
 					if col_alter_write:
-						sql += "{0}( ".format(col_alter_write)
-					sql += 'NEW.{0}'.format(col_remap)
-					if col_alter_write:
-						sql += " )"
+						sql += "{0}".format(col_alter_write)
+					else:
+						sql += 'NEW.{0}'.format(col_remap)
 				sql += "\n\t\t\t\t\t);"
 			sql += "\n\t\tEND CASE;"
 			sql += "\n\t\t-- return now as child has been updated"
@@ -655,10 +664,9 @@ class PGInheritanceView():
 											col_remap = column_alias
 					sql += "{0} = ".format(col)
 					if col_alter_write:
-						sql += "{0}( ".format(col_alter_write)
-					sql += 'NEW.{0}'.format(col_remap)
-					if col_alter_write:
-						sql += " )"
+						sql += "{0}".format(col_alter_write)
+					else:
+						sql += 'NEW.{0}'.format(col_remap)
 					sql += "\n\t\t\t, "
 				sql = sql[:-3]
 				sql += "WHERE {0} = OLD.{1};".format(self.definition['children'][child]['pkey'], self.definition['pkey'])
