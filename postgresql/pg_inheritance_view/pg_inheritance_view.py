@@ -146,7 +146,7 @@ class PGInheritanceView():
 				),
 				self.definition['pkey']
 			)
-			sql += "\t\t\tRAISE EXCEPTION 'Cannot insert {0} as {1} since it already has another subtype. ID: %%', NEW.{2};\n".format(
+			sql += "\t\t\tRAISE EXCEPTION 'Cannot insert {0} as {1} since it already has another subtype. ID: %', NEW.{2};\n".format(
 				self.definition['alias'],
 				child,
 				self.definition['pkey']
@@ -444,7 +444,7 @@ class PGInheritanceView():
 				),
 				self.definition['pkey']
 			)
-			sql += "\t\t\tRAISE EXCEPTION 'Cannot insert {0} as {1} since it already has another subtype. ID: %%', NEW.{2};\n".format(
+			sql += "\t\t\tRAISE EXCEPTION 'Cannot insert {0} as {1} since it already has another subtype. ID: %', NEW.{2};\n".format(
 				self.definition['alias'],
 				child,
 				self.definition['pkey']
