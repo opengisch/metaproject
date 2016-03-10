@@ -9,6 +9,17 @@ spread over different files.
 In general the file syntax is yaml. Other files may be referenced from a yaml
 file.
 
+Requirements
+------------
+
+  * understands table inheritance concept
+  * styles are loaded from a qml file
+  * understands relations
+  * extracts translatable strings into translation files (e.g. .ts)
+  * labelling? qml file? translation?
+  * creates a legend
+  * can be split into multiple files from generic → specific
+
 
 Generators
 ----------
@@ -39,7 +50,6 @@ tables:
 ```
 
 
-
 Project Description
 -------------------
 
@@ -48,7 +58,7 @@ as well as a legend.
 
 ```
 include:
-  qgep_db.yaml
+  qgep_db.yaml # Load the qgep db 
 
 project:
   name: qgep
@@ -56,14 +66,17 @@ project:
   crs: 2056
   extent: [2607360, 1182010, 2625720, 1174450]
   legend:
-    - od_manhole: # Dicionaries are layers
+    - od_manhole: # Dictionaries are layers
       type: layer
       source: @od_manhole
       style: manhole.qml
-      name: Normschacht # This can be skipped and left to the translation unit
-    - Base layer: # Lists are groups
+      name: Manhole # This can be skipped and left to the translation unit
+    - Base layers: # Lists are groups
       - cadastral_data:
         source: [some wms]
+      - some_features:
+        source [some wfs]
+        style: some_features.qml
 ```
 
 
