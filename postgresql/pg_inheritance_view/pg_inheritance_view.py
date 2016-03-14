@@ -400,8 +400,16 @@ class PGInheritanceView():
 				self.definition['pkey'],
 				self.definition['children'][child]['pkey']
 				)
-		if 'additional_join' in self.definition['merge_view']:
-			sql += "\n\t\t{0}".format(self.definition['merge_view']['additional_join'])
+		if 'additional_joins' in self.definition['merge_view']:
+			for join in self.definition['merge_view']['additional_joins']:
+				sql += "\n\t\t{0} JOIN {1} {2} ON {3}.{4} = {2}.{5}".format(
+				self.definition['merge_view']['additional_joins'][join]['type'],
+				self.definition['merge_view']['additional_joins'][join]['table'],
+				join,
+				self.definition['alias'],
+				self.definition['merge_view']['additional_joins'][join]['fkey'],
+				self.definition['merge_view']['additional_joins'][join]['key']
+				)
 		sql += ";\n\n"
 		return sql
 
