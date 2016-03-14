@@ -68,8 +68,16 @@ print(PGInheritanceView(pg_service, definition).sql_all())
     * use `column_alias: column_definition`for each
   * `[allow_type_change]` if `True`, type change within children is allowed (a car can be updated to motorbike), `False` by default.
   * `[merge_columns]` lists columns to be merged
-    * `alias` alias of the merged column
-      * `table: column` replace table name and column name for each column to be merged
+    * `alias` alias of the merged column (replace)
+      * `table: column` table name and column name for each column to be merged (replace)
+  * `[additional_joins]` lists possible additional joins
+    * `alias` alias of the joined table (replace)
+      * `table` the table to be joined
+      * `type` the type of join (INNER, OUTER, LEFT, RIGHT)
+      * `key` the referenced column on joined table
+      * `fkey` the referencing column of parent table
+      
+elements in brackets `[]` are optional, (replace) means that you need to replace the tag element by its actual definition.
 
 
 
