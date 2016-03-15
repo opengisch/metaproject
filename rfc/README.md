@@ -19,7 +19,7 @@ Requirements
   * labelling? qml file? translation?
   * creates a legend
   * can be split into multiple files from generic → specific
-
+  * joins
 
 Generators
 ----------
@@ -49,6 +49,22 @@ tables:
         default: [function to generate serial]
 ```
 
+Includes
+--------
+
+Source files can be included with an `include` directive. An `ìnclude` directive
+loads a yaml file. The structure defined by the included file will be loaded
+before the current file is loaded. The current file has the possibility to overwrite
+any of the specifications in the source file.
+
+```
+layers:
+  fields:
+    - id:
+      alias: ID
+      
+  
+```
 
 Project Description
 -------------------
@@ -57,8 +73,7 @@ A project description file contains metainformation for the project to generate
 as well as a legend.
 
 ```
-include:
-  qgep_db.yaml # Load the qgep db 
+include: qgep_db.yaml # Load the qgep db 
 
 project:
   name: qgep
@@ -92,3 +107,18 @@ an object is found
  * prefixes based on the subtable name will be added on collision
 
 Object inheritance tables are always abstract.
+
+Translation
+-----------
+
+When loading a metaproject file, a .ts file gets produced as a by-product. This file includes the following strings as translation sources:
+
+  * field aliases
+  * layer legend name
+  * value relation value column
+  * value map column
+  * labelling - **how?**
+
+The .ts file can be translated via transifex or qt linguist or other means to any language.
+
+The load metaproject function takes an optional parameter for a translated translation file. In this case, the generated project will be translated with the resources found in the .ts file.
