@@ -66,6 +66,25 @@ layers:
   
 ```
 
+Data sources
+------------
+
+Describe a datasource and how to connect to it. Which fields are available and which constraints apply to the fields.
+
+Layers
+------
+
+Describe how a datasource should be visualized and may override properties of a data source. Multiple layers may reference the same data source.
+
+* Layers can reference a QML style
+* Layers can define actions
+  * python (required)
+* Fields will be loaded from the dataprovider and appropriate widgets will be created - based on:
+  * datatype
+  * constraints
+  * relations
+* Field definitions can be overwritten with more appropriate user values
+
 Project Description
 -------------------
 
@@ -93,7 +112,6 @@ project:
         source [some wfs]
         style: some_features.qml
 ```
-
 
 View generator
 --------------
