@@ -533,6 +533,7 @@ class PGInheritanceView():
 				else:
 					sql += 'NEW.{0}'.format(col_remap)
 			sql += "\n\t\t);\n"
+		sql += "\n\t\t ELSE NULL;"
 		sql += "\n\t END CASE;\n"
 
 		# end trigger function
