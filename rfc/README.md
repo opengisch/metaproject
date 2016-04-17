@@ -3,11 +3,11 @@ Concept
 =======
 
 The basic idea is to be able to integrate information from different sources
-into a QGIS project file. Sources can be manually written or generated and be
-spread over different files.
+into a QGIS project file. Sources can *generated* from resources like a database
+or *manually written* and they may be spread over different files.
 
 In general the file syntax is yaml. Other files may be referenced from a yaml
-file.
+file if suitable.
 
 Requirements
 ------------
@@ -21,8 +21,41 @@ Requirements
   * can be split into multiple files from generic → specific
   * joins
 
-Generators
-----------
+Configurable aspects
+--------------------
+
+### Project
+
+#### Legend
+
+#### CRS
+
+#### Initial extent
+
+#### Relations
+
+#### Style presets
+
+
+### Layers
+
+#### Layer ID
+
+#### Data source
+
+#### Style (symbology)
+
+#### Labelling
+
+#### Actions
+
+#### Forms
+
+#### Widgets/Fields
+
+
+
+## Generators
 
 Generators extract information which can be used in a .qgs project file from
 data sources like postgres databases. This will be brought into an intermediate
@@ -49,8 +82,7 @@ tables:
         default: [function to generate serial]
 ```
 
-Includes
---------
+## Includes
 
 Source files can be included with an `include` directive. An `ìnclude` directive
 loads a yaml file. The structure defined by the included file will be loaded
@@ -66,8 +98,7 @@ layers:
   
 ```
 
-Data sources
-------------
+## Data sources
 
 Describe a datasource and how to connect to it. Which fields are available and which constraints apply to the fields.
 
