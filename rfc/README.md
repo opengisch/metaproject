@@ -66,6 +66,8 @@ Is a simple boolean flag
 
 #### Custom layer properties
 
+#### Feature title
+
 
 ## Generators
 
