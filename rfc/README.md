@@ -36,6 +36,13 @@ Configurable aspects
 
 #### Style presets
 
+#### Custom properties
+
+#### Transaction groups
+
+Is a simple boolean flag
+
+
 
 ### Layers
 
@@ -53,6 +60,11 @@ Configurable aspects
 
 #### Widgets/Fields
 
+#### Joins
+
+#### Virtual fields
+
+#### Custom layer properties
 
 
 ## Generators
