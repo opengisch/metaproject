@@ -26,13 +26,63 @@ Configurable aspects
 
 ### Project
 
+The project node contains base information about a project which is not specific to a particular layer.
+
+The project will be read from the key project
+
+    project:
+      crs: 21781
+      name: My Project
+      legend:
+        - covers:
+          <<: *lyr_qgep_vw_qgep_cover
+        - a layer group:
+          - baselayer:
+            source: baselayer.shp
+            style: layer2.qml
+
 #### Legend
+
+The legend consists of a list where each element is either a layer or a layer group.
+If an element is a key/value pair it's interpreted as a layer, if it's a list, it's treated as a layer group.
+
+```
+project:
+  legend:
+  - layer:
+    source: layer.shp
+    style: layer.qml
+  - group:
+    - layer2:
+      provider: postgres
+      source: service='pg_qgep' key='"obj_id"' estimatedmetadata=true table="qgep"."od_maintenance_event" sql=
+    - layer3:
+      ...
+```
 
 #### CRS
 
+The CRS is specified as a simple EPSG number
+
+    crs: 21781
+    
+If the CRS is not specified, the crs of the first layer which is found will be used.
+    
+Further requirements like custom CRSes are not planned at the moment but may be added on request.
+
 #### Initial extent
 
+The initial extent can be specified as an array of xmin, xmax, ymin, ymax
+
+    extent: [643700, 649410, 18300, 180200]
+    
+or a layer can be specified which will be queried for the extent. Just specify the layer id as string.
+
+    extent: layer_id
+
 #### Relations
+
+    relations:
 
 #### Style presets
 
