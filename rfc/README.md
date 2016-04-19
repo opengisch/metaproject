@@ -30,16 +30,18 @@ The project node contains base information about a project which is not specific
 
 The project will be read from the key project
 
-    project:
-      crs: 21781
-      name: My Project
-      legend:
-        - covers:
-          <<: *lyr_qgep_vw_qgep_cover
-        - a layer group:
-          - baselayer:
-            source: baselayer.shp
-            style: layer2.qml
+```
+project:
+  crs: 21781
+  name: My Project
+  legend:
+    - covers:
+      <<: *lyr_qgep_vw_qgep_cover
+    - a layer group:
+      - baselayer:
+        source: baselayer.shp
+        style: layer2.qml
+```
 
 #### Legend
 
@@ -60,12 +62,17 @@ project:
       ...
 ```
 
+This is the "main entry point" for loading layers. While it's possible to specify layers directly in here, it's often more advisable to load them from somewhere else via reference.
+
 #### CRS
 
 The CRS is specified as a simple EPSG number
 
-    crs: 21781
-    
+```
+project:
+  crs: 21781
+```
+  
 If the CRS is not specified, the crs of the first layer which is found will be used.
     
 Further requirements like custom CRSes are not planned at the moment but may be added on request.
@@ -74,19 +81,29 @@ Further requirements like custom CRSes are not planned at the moment but may be 
 
 The initial extent can be specified as an array of xmin, xmax, ymin, ymax
 
-    extent: [643700, 649410, 18300, 180200]
+```
+project:
+  extent: [643700, 649410, 18300, 180200]
+```
     
 or a layer can be specified which will be queried for the extent. Just specify the layer id as string.
 
-    extent: layer_id
+```
+project:
+  extent: layer_id
+```
 
 #### Relations
 
-    relations:
+relations:
 
 #### Style presets
 
+To be done
+
 #### Custom properties
+
+
 
 #### Transaction groups
 
@@ -116,8 +133,19 @@ Is a simple boolean flag
 
 #### Custom layer properties
 
+```
+layer:
+  properties:
+    pluginX/configOption: 1
+    pluginY/cfg: foo
+```
+
 #### Feature title
 
+```
+layer:
+  feature_title: COALESCE("identifier", 'N/A')
+```
 
 ## Generators
 
