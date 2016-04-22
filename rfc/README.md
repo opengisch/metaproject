@@ -169,13 +169,51 @@ It is possible to specify a specific data provider to define where a layer is lo
 
 ```
 layername:
-  source: 
+  source: service='pg_qgep' key='"obj_id"' estimatedmetadata=true table="qgep"."od_cover" sql=
   provider: postgres
 ```
 
-#### Style (symbology)
+Supported provider types are defined by QGIS but for a short reference:
 
-#### Labelling
+ * postgres
+ * spatialite
+ * ogr
+ * gdal
+ * wms
+ * wfs
+ * [others](https://github.com/qgis/QGIS/tree/master/src/providers)
+
+In this case, the source string depends on the provider in use.
+
+#### Symbology
+
+The style node is a simple reference to a QML file which is looked up on a path relative to the path of the current file.
+
+```
+layer:
+  symbology: covers_symbology.qml
+```
+
+From this file, ONLY the symbology definitions are loaded. Labeling, widgets, joins and everything else that has been thrown into this file is loaded and defined separately.
+
+**Note:** It is possible that a way of defining a style in yaml will be introduced in the future.
+
+**Note:** A new layer property `style` may be introduced in the future to load everything from a qml file.
+
+#### Labeling
+
+The style node is a simple reference to a QML file which is looked up on a path relative to the path of the current file.
+
+```
+layer:
+  labels: covers_labels.qml
+```
+
+From this file, ONLY the symbology definitions are loaded. Labeling, widgets, joins and everything else that has been thrown into this file is loaded and defined separately.
+
+**Note:** It is possible that a way of defining a style in yaml will be introduced in the future.
+
+**Note:** A new layer property `style` may be introduced in the future to load everything from a qml file.
 
 #### Actions
 
