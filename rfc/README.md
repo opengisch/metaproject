@@ -260,7 +260,7 @@ This will cause two things to happen:
 layer:
   actions:
     - name: Party
-      icon: 	🎉
+      icon: 🎉
       type: python
       action: |
 
