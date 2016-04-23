@@ -83,7 +83,7 @@ The initial extent can be specified as an array of xmin, xmax, ymin, ymax
 
 ```
 project:
-  extent: [643700, 649410, 18300, 180200]
+  extent: [643700, 649410, 180300, 184200]
 ```
     
 or a layer can be specified which will be queried for the extent. Just specify the layer id as string.
@@ -103,13 +103,30 @@ To be done
 
 #### Custom properties
 
+Custom properties are simple key value pairs and mapped as such
 
+```
+project:
+  custom_properties:
+    my_plugin/initial_value/of_something: 400
+    some_other_setting/is: True
+    or/can/be/a_string: "Which can be specified like so"
+    or/even/multiline: >
+
+The existence of the human conception of self-awareness can
+only be understood by humans and is a complex topic in itself.
+You could ask René Descardes if he would still be among us who
+once came to a similar conclusion. *Cogito ergo sum*.
+```
 
 #### Transaction groups
 
 Is a simple boolean flag
 
-
+```
+project:
+  autotransaction: True
+```
 
 ### Layers
 
@@ -209,11 +226,33 @@ layer:
   labels: covers_labels.qml
 ```
 
-From this file, ONLY the symbology definitions are loaded. Labeling, widgets, joins and everything else that has been thrown into this file is loaded and defined separately.
+From this file, ONLY the label definitions are loaded. Symbology, widgets, joins and everything else that has been thrown into this file is loaded and defined separately.
 
 **Note:** It is possible that a way of defining a style in yaml will be introduced in the future.
 
 **Note:** A new layer property `style` may be introduced in the future to load everything from a qml file.
+
+##### Translation of labels
+
+Translation of labels (often) needs to translate strings from the database what makes it more complex than translation of strings from this project definition. Translation of labels is done with the use of regular expressions.
+
+```
+layer:
+  labeling:
+    source: xyz.qml
+    translation_rules:
+      - regex: "^Cover"
+        default: "Cover"
+```
+
+This will cause two things to happen:
+
+ * A new entry in the translation table for "Cover" which is the default translation
+ * Wrap the label expression in a regex `s/^Cover/{default or translated text}/g`. This allows using backreferences and advanced regex magic.
+
+**Note:** Still need to figure out rule based labeling translation
+
+**Problem:** Exporting the labels to qml from a generated project will cause the labels to already contain the regex and reusing it will result in double-wrapping. Maybe we will need to add information about this in an expression comment or similar.
 
 #### Actions
 
