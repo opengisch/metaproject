@@ -264,10 +264,12 @@ layer:
       type: python
       action: |
 
-  from qgis.core import Drinks, Fireworks
+        from qgis.core import Drinks, Fireworks, Mood
 
-  Fireworks().launch()
-  Drinks().serve()
+        Fireworks().launch()
+        mood = Mood()
+        while mood.ok():
+            Drinks().serve()
 ```
 
 #### Forms
