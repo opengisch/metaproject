@@ -256,6 +256,20 @@ This will cause two things to happen:
 
 #### Actions
 
+```
+layer:
+  actions:
+    - name: Party
+      icon: 	🎉
+      type: python
+      action: |
+
+  from qgis.core import Drinks, Fireworks
+
+  Fireworks().launch()
+  Drinks().serve()
+```
+
 #### Forms
 
 #### Widgets/Fields
