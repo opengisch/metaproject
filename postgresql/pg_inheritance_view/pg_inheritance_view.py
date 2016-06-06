@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 
 import psycopg2, psycopg2.extras
@@ -49,10 +49,31 @@ class PGInheritanceView():
 		else:
 			return None
 
+
 	def join_view_name(self, child, schema_qualified=True):
 		name =  '{0}.'.format(self.definition['schema']) if schema_qualified else ''
 		name +='vw_{0}_{1}'.format(self.definition['alias'], child)
 		return name
+	
+	
+	def print_nodes(node_children, parents=None):
+
+	  if node_children is None:
+		yield parents
+		return
+
+	  if parents is None:
+		parents = []
+
+	  for key in node_children:
+		child = node_children[key]   # we get dict of children
+		parents.append(key)
+		yield from print_nodes(child, parents)
+		del parents[-1]
+	
+	
+	def sql_all_2(self):
+		
 
 	def sql_all(self):
 		sql = ''
