@@ -167,10 +167,12 @@ class PGInheritanceView():
         # Now, generate triggers for each view that needs it
         self.hierarchy = []
         self.get_all_hierarchy(self.definition)
+        print '\n'.join(self.hierarchy)
 
         self.sqlTriggers = ""
         self.recursive_triggers(self.definition, 0)
         self.executeSql(self.sqlTriggers)
+        #print self.sqlTriggers
 
         # return empty SQL because we now execute it in this code
         return sql
@@ -202,20 +204,16 @@ class PGInheritanceView():
         for h in self.hierarchy:
             tabHierarchy = h.split(',')
             if alias in tabHierarchy:
-                print tabHierarchy
+                #print tabHierarchy
                 pos = tabHierarchy.index(alias)
-                if pos == len(tabHierarchy) - 1:  # If it is at the end of a hierarchy, then take all the parents and build the triggers with that (ex: element, node)
-                    if not gotParents:
-                        relatedDef = tabHierarchy
-                        relatedDefParent = tabHierarchy
+                if pos == (len(tabHierarchy) - 1):  # If it is at the end of a hierarchy, then take all the parents and build the triggers with that (ex: element, node)
+                    if gotParents == False :
+                        relatedDef = list(tabHierarchy)
+                        relatedDefParent = list(tabHierarchy)
                         gotParents = True
-                    print 'iiiiiiiiiiiiiiiiiiiiiiiiiiiiiii'
-                    print relatedDefParent
-                    print '==============================='
                 else:
                     # Get the parents
-                    if not gotParents:
-                        print 'uuuuuuuuuuuuuuuuuuu'
+                    if gotParents == False:
                         relatedDef = tabHierarchy[:pos]
                         relatedDefParent = tabHierarchy[:pos]
                         gotParents = True
@@ -226,11 +224,7 @@ class PGInheritanceView():
         relatedDef = [d.replace(triTag, '') for d in relatedDef]
         relatedDefParent = [d.replace(triTag, '') for d in relatedDefParent]
         relatedDefChildr = [d.replace(triTag, '') for d in relatedDefChildr]
-        print relatedDef
-        print relatedDefParent
-        print relatedDefChildr
         return relatedDef
-
 
     def recursive_triggers(self, definition, level):
         if 'children' in definition:
@@ -239,22 +233,26 @@ class PGInheritanceView():
                 child_alias = child_def['alias']
                 if 'trig_here' in child_def and child_def['trig_here'] is True:
                     viewname = self.join_view_name(definition, child)
-                    #print "Trigger for {viewname}".format(viewname=viewname)
-                    # Then generate the trigger at that level, and it must contains the code of the current def, and the one of the childrens
+                    #print "============================================================================== Triggers for {viewname}".format(viewname=viewname)
+                    # Then generate the trigger at that level, and it must contains the code of the current def, and the one of the childrens, and the parent !
                     relatedDef = self.get_def_hierarchy(child_alias)
                     # print self.trigCodeInsertDict[child_alias]
 
+                    sqlInsert = ''
+                    sqlUpdate = ''
+                    sqlDelete = ''
+
                     # Fill self.sqlTriggers
                     sqlInsert = self.trigStructInsertDict[child_alias]
-                    sqlUpdate = self.trigStructUpdateDict[child_alias]
-                    sqlDelete = self.trigStructDeleteDict[child_alias]
+                    #sqlUpdate = self.trigStructUpdateDict[child_alias]
+                    #sqlDelete = self.trigStructDeleteDict[child_alias]
 
                     codeToPlace = ''
                     for rd in relatedDef:
-                        print '******************* '+ rd + '  ( ' + ','.join(relatedDef) + ' )'
+                        #print '*************************************************************************** '+ rd + '  ( ' + ','.join(relatedDef) + ' )'
                         if rd == 'node':  # TODO TEST TEST TEST
-                            continue
-                        # We need to take node from trigCodeMergeInsertDict
+                            continue  # TODO add a tag to tell that it is the highest parent
+                        # We need to take code from trigCodeMergeInsertDict
                         #codeParentToPlace = "\n--TO_REPLACE--\n{code}".format(code=self.trigCodeMergeInsertDict[rd])
                         #print codeParentToPlace
                         if rd in self.trigCodeMergeInsertDict:
@@ -275,11 +273,13 @@ class PGInheritanceView():
                                 print rd
                                 print '-------------------------------------'
 
+                        """
                         codeToPlace = "\n--TO_REPLACE--\n{code}".format(code=self.trigCodeUpdateDict[rd])
                         sqlUpdate = sqlUpdate.replace("--TO_REPLACE--", codeToPlace)
 
                         codeToPlace = "\n--TO_REPLACE--\n{code}".format(code=self.trigCodeDeleteDict[rd])
                         sqlDelete = sqlDelete.replace("--TO_REPLACE--", codeToPlace)
+                        """
 
                     self.sqlTriggers += "{insert}{update}{delete}".format(insert=sqlInsert, update=sqlUpdate, delete=sqlDelete)
                     self.sqlTriggers += self.sqlTriggers.replace("--TO_REPLACE--", "")
