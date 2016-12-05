@@ -131,15 +131,15 @@ class PGInheritanceView():
                 # Check if the trigger has to be generated in the child view or the parent view
                 # We need to know where the following sql has to be inserted, and to do this, wee need to save the header and footer of the function trigger (and we will fill them later)
 
-                sqlInsertTrigger, sqlInsertStructTrigger = self.sql_join_insert_trigger(definition, child, False)
+                sqlInsertTrigger, sqlInsertStructTrigger = self.sql_join_insert_trigger(definition, child, False, True)
                 self.trigCodeInsertDict[child] = sqlInsertTrigger
                 self.trigStructInsertDict[child] = sqlInsertStructTrigger
 
-                sqlUpdateTrigger, sqlUpdateStructTrigger = self.sql_join_update_trigger(definition, child, False)
+                sqlUpdateTrigger, sqlUpdateStructTrigger = self.sql_join_update_trigger(definition, child, False, True)
                 self.trigCodeUpdateDict[child] = sqlUpdateTrigger
                 self.trigStructUpdateDict[child] = sqlUpdateStructTrigger
 
-                sqlDeleteTrigger, sqlDeleteStructTrigger = self.sql_join_delete_trigger(definition, child, False)
+                sqlDeleteTrigger, sqlDeleteStructTrigger = self.sql_join_delete_trigger(definition, child, False, True)
                 self.trigCodeDeleteDict[child] = sqlDeleteTrigger
                 self.trigStructDeleteDict[child] = sqlDeleteStructTrigger
 
@@ -162,12 +162,26 @@ class PGInheritanceView():
             sqlTriggers += sqlStruct.replace("--TO_REPLACE--", sql)
 
             self.executeSql(sqlTriggers)
+            
+            # We also need to store single triggers for current def.
+            sqlInsertTrigger, sqlInsertStructTrigger = self.sql_join_insert_trigger(definition, child, False, False)
+            self.trigCodeInsertDict[definition['alias']] = sqlInsertTrigger
+            self.trigStructInsertDict[definition['alias']] = sqlInsertStructTrigger
+
+            sqlUpdateTrigger, sqlUpdateStructTrigger = self.sql_join_update_trigger(definition, child, False, False)
+            self.trigCodeUpdateDict[definition['alias']] = sqlUpdateTrigger
+            self.trigStructUpdateDict[definition['alias']] = sqlUpdateStructTrigger
+
+            sqlDeleteTrigger, sqlDeleteStructTrigger = self.sql_join_delete_trigger(definition, child, False, False)
+            self.trigCodeDeleteDict[definition['alias']] = sqlDeleteTrigger
+            self.trigStructDeleteDict[definition['alias']] = sqlDeleteStructTrigger
 
             #sql = '{views}{triggers}'.format(views=sqlViews, triggers=sqlTriggers);
         # Now, generate triggers for each view that needs it
+
         self.hierarchy = []
         self.get_all_hierarchy(self.definition)
-        print '\n'.join(self.hierarchy)
+        #print '\n'.join(self.hierarchy)
 
         self.sqlTriggers = ""
         self.recursive_triggers(self.definition, 0)
@@ -175,6 +189,7 @@ class PGInheritanceView():
         #print self.sqlTriggers
 
         # return empty SQL because we now execute it in this code
+        sql = ''
         return sql
 
     def get_all_hierarchy(self, definition, level=1, parents=''):
@@ -194,13 +209,14 @@ class PGInheritanceView():
                 child_def = definition['children'][child]
                 self.get_all_hierarchy(child_def, level + 1, parents)
 
-    def get_def_hierarchy(self, alias):
+    def get_def_hierarchy(self, alias, trigAssociated):
         gotParents = False
         relatedDef = []
         relatedDefParent = []
         relatedDefChildr = []
         triTag = '#t'
-        alias = alias + triTag  # If we arrive here, that means the alias has a trig_here tag associated
+        if trigAssociated:
+            alias = alias + triTag  # If we arrive here, that means the alias has a trig_here tag associated
         for h in self.hierarchy:
             tabHierarchy = h.split(',')
             if alias in tabHierarchy:
@@ -224,7 +240,7 @@ class PGInheritanceView():
         relatedDef = [d.replace(triTag, '') for d in relatedDef]
         relatedDefParent = [d.replace(triTag, '') for d in relatedDefParent]
         relatedDefChildr = [d.replace(triTag, '') for d in relatedDefChildr]
-        return relatedDef
+        return relatedDefParent, relatedDefChildr
 
     def recursive_triggers(self, definition, level):
         if 'children' in definition:
@@ -233,10 +249,8 @@ class PGInheritanceView():
                 child_alias = child_def['alias']
                 if 'trig_here' in child_def and child_def['trig_here'] is True:
                     viewname = self.join_view_name(definition, child)
-                    #print "============================================================================== Triggers for {viewname}".format(viewname=viewname)
                     # Then generate the trigger at that level, and it must contains the code of the current def, and the one of the childrens, and the parent !
-                    relatedDef = self.get_def_hierarchy(child_alias)
-                    # print self.trigCodeInsertDict[child_alias]
+                    relatedDefParent, relatedDefChildren = self.get_def_hierarchy(child_alias, True)
 
                     sqlInsert = ''
                     sqlUpdate = ''
@@ -244,46 +258,71 @@ class PGInheritanceView():
 
                     # Fill self.sqlTriggers
                     sqlInsert = self.trigStructInsertDict[child_alias]
-                    #sqlUpdate = self.trigStructUpdateDict[child_alias]
-                    #sqlDelete = self.trigStructDeleteDict[child_alias]
+                    sqlUpdate = self.trigStructUpdateDict[child_alias]
+                    sqlDelete = self.trigStructDeleteDict[child_alias]
 
                     codeToPlace = ''
-                    for rd in relatedDef:
-                        #print '*************************************************************************** '+ rd + '  ( ' + ','.join(relatedDef) + ' )'
-                        if rd == 'node':  # TODO TEST TEST TEST
-                            continue  # TODO add a tag to tell that it is the highest parent
+                    for rd in relatedDefParent:
+                        print '*************************************************************************** '+ child_alias + '  ( ' + ','.join(relatedDefParent) + ' )' + '  ( ' + ','.join(relatedDefChildren) + ' )'
+
+                        #if rd == child_alias:
+                            #continue
+                        # => il faut tester si RD has child, et si les child n ont pas  le  #t. 
+                        # Si les enfants ont le #t => alors trigger table, sinon trigger merge ?
+                        rdParent, rdChildrens = self.get_def_hierarchy(rd, True)
+                        if len(rdChildrens) > 0:
+                            if rd in self.trigCodeMergeInsertDict: 
+                                # We need to take code from trigCodeMergeInsertDict
+                                #codeParentToPlace = "\n--TO_REPLACE--\n{code}".format(code=self.trigCodeMergeInsertDict[rd])
+                                #print codeParentToPlace
+
+                                codeToPlace = "\n--TO_REPLACE--\n{code}".format(code=self.trigCodeMergeInsertDict[rd])
+                                sqlInsert = sqlInsert.replace("--TO_REPLACE--", codeToPlace)
+
+                                codeToPlace = "\n--TO_REPLACE--\n{code}".format(code=self.trigCodeMergeUpdateDict[rd])
+                                sqlUpdate = sqlUpdate.replace("--TO_REPLACE--", codeToPlace)
+
+                                codeToPlace = "\n--TO_REPLACE--\n{code}".format(code=self.trigCodeMergeDeleteDict[rd])
+                                sqlDelete = sqlDelete.replace("--TO_REPLACE--", codeToPlace)
+                        else:
+                            codeToPlace = "\n--TO_REPLACE--\n{code}".format(code=self.trigCodeInsertDict[rd])
+                            sqlInsert = sqlInsert.replace("--TO_REPLACE--", codeToPlace)
+
+                            codeToPlace = "\n--TO_REPLACE--\n{code}".format(code=self.trigCodeUpdateDict[rd])
+                            sqlUpdate = sqlUpdate.replace("--TO_REPLACE--", codeToPlace)
+
+                            codeToPlace = "\n--TO_REPLACE--\n{code}".format(code=self.trigCodeDeleteDict[rd])
+                            sqlDelete = sqlDelete.replace("--TO_REPLACE--", codeToPlace)
+
+                    self.sqlTriggers += "{insert}{update}{delete}".format(insert=sqlInsert, update=sqlUpdate, delete=sqlDelete)
+
+                    for rd in relatedDefChildren:
+                        print '*************************************************************************** '+ rd + '  ( ' + ','.join(relatedDefChildren) + ' )'
+                        #if rd == 'node':  # TODO TEST TEST TEST
+                            #continue  # TODO add a tag to tell that it is the highest parent
                         # We need to take code from trigCodeMergeInsertDict
                         #codeParentToPlace = "\n--TO_REPLACE--\n{code}".format(code=self.trigCodeMergeInsertDict[rd])
                         #print codeParentToPlace
-                        if rd in self.trigCodeMergeInsertDict:
-                            codeToPlace = "\n--TO_REPLACE--\n{code}".format(code=self.trigCodeMergeInsertDict[rd])
-                        else:
-                            codeToPlace = "\n--TO_REPLACE--\n{code}".format(code=self.trigCodeInsertDict[rd])
-                        #print 'iiiiiiii'
-                        
-                        #if child_alias == 'installation':   # TEST
-                            #sqlInsertTrigger, sqlInsertStructTrigger = self.sql_join_insert_trigger(definition, child, False)
-                            #print sqlInsertTrigger
-                        
+
+                        # TODO : we have to check for every child, if there is subchildren
+                        # If no subchildren, don't take the child trig definition, cause the parent's merge one will include the code the all the children
+                        rdParent, rdChildrens = self.get_def_hierarchy(rd, False)
+                        print rdParent
+                        print rdChildrens
+                        #if len(rdChildrens) > 0:
+
+                        codeToPlace = "\n--TO_REPLACE--\n{code}".format(code=self.trigCodeInsertDict[rd])
                         sqlInsert = sqlInsert.replace("--TO_REPLACE--", codeToPlace)
 
-                        if child_alias == 'installation':   # TEST
-                            if codeToPlace.find('WHEN NEW.installation_type') > -1:
-                                #print codeToPlace
-                                print rd
-                                print '-------------------------------------'
-
-                        """
                         codeToPlace = "\n--TO_REPLACE--\n{code}".format(code=self.trigCodeUpdateDict[rd])
                         sqlUpdate = sqlUpdate.replace("--TO_REPLACE--", codeToPlace)
 
                         codeToPlace = "\n--TO_REPLACE--\n{code}".format(code=self.trigCodeDeleteDict[rd])
                         sqlDelete = sqlDelete.replace("--TO_REPLACE--", codeToPlace)
-                        """
 
                     self.sqlTriggers += "{insert}{update}{delete}".format(insert=sqlInsert, update=sqlUpdate, delete=sqlDelete)
                     self.sqlTriggers += self.sqlTriggers.replace("--TO_REPLACE--", "")
-                    
+
                     #if child_alias == 'installation':   # TEST
                         #print self.sqlTriggers
                         #print "-------------------------------------------------"
@@ -345,7 +384,7 @@ class PGInheritanceView():
         return sql
 
 
-    def sql_join_insert_trigger(self, definition, child, trig_header):
+    def sql_join_insert_trigger(self, definition, child, trig_header, generateChild):
         parent_columns = self.getColumns(definition, False)
         child_columns = self.getColumns(definition['children'][child], True)
 
@@ -433,26 +472,27 @@ class PGInheritanceView():
 
             sql += "\n\t\t) RETURNING {0} INTO NEW.{0};\n".format(definition['pkey'])
 
-        # insert into child
-        sql += "\n\t\tINSERT INTO {0} (\n\t\t\t{1}\n\t\t\t{2}\n\t\t) VALUES (\n\t\t\tNEW.{3} ".format(
-            definition['children'][child]['c_table'],
-            definition['children'][child]['pkey'],
-            '\n\t\t\t'.join([", {0}".format(col) for col in child_columns]),
-            definition['pkey']
-            )
-        for col in child_columns:
-            col_alter_write = self.column_alter_write(definition['children'][child], col, True)
-            col_remap = self.column_remap(definition['children'][child], col)
+        if generateChild:
+            # insert into child
+            sql += "\n\t\tINSERT INTO {0} (\n\t\t\t{1}\n\t\t\t{2}\n\t\t) VALUES (\n\t\t\tNEW.{3} ".format(
+                definition['children'][child]['c_table'],
+                definition['children'][child]['pkey'],
+                '\n\t\t\t'.join([", {0}".format(col) for col in child_columns]),
+                definition['pkey']
+                )
+            for col in child_columns:
+                col_alter_write = self.column_alter_write(definition['children'][child], col, True)
+                col_remap = self.column_remap(definition['children'][child], col)
 
-            sql += "\n\t\t\t, "
-            if col_alter_write:
-                sql += '{0}'.format(col_alter_write)
-            elif col_remap:
-                sql += 'NEW.{0}'.format(col_remap)
-            else:
-                sql += 'NEW.{0}'.format(col)
+                sql += "\n\t\t\t, "
+                if col_alter_write:
+                    sql += '{0}'.format(col_alter_write)
+                elif col_remap:
+                    sql += 'NEW.{0}'.format(col_remap)
+                else:
+                    sql += 'NEW.{0}'.format(col)
 
-        sql += "\n\t\t);\n"
+            sql += "\n\t\t);\n"
 
         sqlFooter = ''
         # end trigger function
@@ -476,7 +516,7 @@ class PGInheritanceView():
 
         return sql, sqlStruct
 
-    def sql_join_update_trigger(self, definition, child, trig_header):
+    def sql_join_update_trigger(self, definition, child, trig_header, generateChild):
         parent_columns = self.getColumns(definition, False)
         child_columns = self.getColumns(definition['children'][child], True)
 
@@ -545,7 +585,7 @@ class PGInheritanceView():
         return sql, sqlStruct
 
 
-    def sql_join_delete_trigger(self, definition, child, trig_header):
+    def sql_join_delete_trigger(self, definition, child, trig_header, generateChild):
 
         functrigger = "{0}.ft_{1}_{2}_delete".format(definition['schema'],    definition['alias'], child)
         trigger = "tr_{1}_{2}_delete".format(definition['schema'],    definition['alias'], child)
