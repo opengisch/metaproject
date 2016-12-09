@@ -271,23 +271,23 @@ class PGInheritanceViewRecursive():
                         if len(rdChildrens) > 0:
                             if rd in self.trigCodeMergeInsertDict: 
                                 # We need to take code from trigCodeMergeInsertDict
-                                codeToPlace = "{replace_code}\n{code}".format(code=self.trigCodeMergeInsertDict[rd], replace_code=self.REPLACE_TAG)
+                                codeToPlace = "{code}\n{replace_code}\n".format(code=self.trigCodeMergeInsertDict[rd], replace_code=self.REPLACE_TAG)
                                 sqlInsert = sqlInsert.replace(self.REPLACE_TAG, codeToPlace)
 
-                                codeToPlace = "{replace_code}\n{code}".format(code=self.trigCodeMergeUpdateDict[rd], replace_code=self.REPLACE_TAG)
+                                codeToPlace = "{code}\n{replace_code}\n".format(code=self.trigCodeMergeUpdateDict[rd], replace_code=self.REPLACE_TAG)
                                 sqlUpdate = sqlUpdate.replace(self.REPLACE_TAG, codeToPlace)
 
-                                codeToPlace = "{replace_code}\n{code}".format(code=self.trigCodeMergeDeleteDict[rd], replace_code=self.REPLACE_TAG)
+                                codeToPlace = "{code}\n{replace_code}\n".format(code=self.trigCodeMergeDeleteDict[rd], replace_code=self.REPLACE_TAG)
                                 sqlDelete = sqlDelete.replace(self.REPLACE_TAG, codeToPlace)
 
                         else:
-                            codeToPlace = "{replace_code}\n{code}".format(code=self.trigCodeInsertDict[rd], replace_code=self.REPLACE_TAG)
+                            codeToPlace = "{code}\n{replace_code}\n".format(code=self.trigCodeInsertDict[rd], replace_code=self.REPLACE_TAG)
                             sqlInsert = sqlInsert.replace(self.REPLACE_TAG, codeToPlace)
 
-                            codeToPlace = "{replace_code}\n{code}".format(code=self.trigCodeUpdateDict[rd], replace_code=self.REPLACE_TAG)
+                            codeToPlace = "{code}\n{replace_code}\n".format(code=self.trigCodeUpdateDict[rd], replace_code=self.REPLACE_TAG)
                             sqlUpdate = sqlUpdate.replace(self.REPLACE_TAG, codeToPlace)
 
-                            codeToPlace = "{replace_code}\n{code}".format(code=self.trigCodeDeleteDict[rd], replace_code=self.REPLACE_TAG)
+                            codeToPlace = "{code}\n{replace_code}\n".format(code=self.trigCodeDeleteDict[rd], replace_code=self.REPLACE_TAG)
                             sqlDelete = sqlDelete.replace(self.REPLACE_TAG, codeToPlace)
 
                     self.sqlTriggers += "{insert}{update}{delete}".format(insert=sqlInsert, update=sqlUpdate, delete=sqlDelete)
