@@ -148,8 +148,6 @@ class PGInheritanceViewRecursive():
                 self.trigCodeDeleteDict[child] = sqlDeleteTrigger
                 self.trigStructDeleteDict[child] = sqlDeleteStructTrigger
 
-                #sqlTriggers += sqlInsertTrigger + sqlUpdateTrigger + sqlDeleteTrigger
-
             # We need those for merged views
             sql, sqlStruct = self.sql_merge_insert_trigger(definition, False)
             self.trigCodeMergeInsertDict[definition['alias']] = sql
@@ -188,25 +186,19 @@ class PGInheritanceViewRecursive():
                 self.trigStructDeleteDict[definition['alias']] = sqlDeleteStructTrigger
 
 
-            #sql = '{views}{triggers}'.format(views=sqlViews, triggers=sqlTriggers);
         # Now, generate triggers for each view that needs it
-
         self.hierarchy = []
         self.get_all_hierarchy(self.definition)
-        #print '\n'.join(self.hierarchy)
 
         self.sqlTriggers = ""
         self.recursive_triggers(self.definition, 0)
         self.executeSql(self.sqlTriggers)
-        #print self.sqlTriggers
 
         # return empty SQL because we now execute it in this code
         sql = ''
         return sql
 
     def get_all_hierarchy(self, definition, level=1, parents=''):
-        #print ' ' * level + ' ' + parents + ' ' + definition['alias']
-        #print parents + ',' + definition['alias']
         trigHere = ''
         if 'trig_here' in definition and definition['trig_here'] is True:
             trigHere = '#t'
@@ -232,7 +224,6 @@ class PGInheritanceViewRecursive():
         for h in self.hierarchy:
             tabHierarchy = h.split(',')
             if alias in tabHierarchy:
-                #print tabHierarchy
                 pos = tabHierarchy.index(alias)
                 if pos == (len(tabHierarchy) - 1):  # If it is at the end of a hierarchy, then take all the parents and build the triggers with that (ex: element, node)
                     if gotParents == False :
@@ -275,71 +266,30 @@ class PGInheritanceViewRecursive():
 
                     codeToPlace = ''
                     for rd in relatedDefParent:
-                        #print '*************************************************************************** '+ child_alias + '  ( ' + ','.join(relatedDefParent) + ' )' + '  ( ' + ','.join(relatedDefChildren) + ' )'
 
-                        # => il faut tester si RD has child, et si les child n ont pas  le  #t. 
-                        # Si les enfants ont le #t => alors trigger table, sinon trigger merge ?
                         rdParent, rdChildrens = self.get_def_hierarchy(rd, True)
-                        #rdParent, rdChildrens = self.get_def_hierarchy(rd, False) # TODO  True or false ?
-
-                        #isRd = False
-                        #genParent = True
-                        #genChild = True
-                        #if rd == child_alias:
-                            #isRd = True
-                            #genParent = False
-                            #genChild = False
-
-                        #if rd == "node":
-                            #print rdParent
-                            #print rdChildrens
-
-                        # Check if rd has a parent and childs
-                        #hasParentAndChildren = False
-                        #if rd in rdParent and len(rdChildrens) > 0:
-                            #hasParentAndChildren = True
-
 
                         if len(rdChildrens) > 0:
                             if rd in self.trigCodeMergeInsertDict: 
                                 # We need to take code from trigCodeMergeInsertDict
                                 codeToPlace = "{replace_code}\n{code}".format(code=self.trigCodeMergeInsertDict[rd], replace_code=self.REPLACE_TAG)
                                 sqlInsert = sqlInsert.replace(self.REPLACE_TAG, codeToPlace)
-                                #if child_alias == "installation" or child_alias == "meter":
-                                    #if 'qwat_od.vw_node_element' in codeToPlace:
-                                        #print "INSERT(haschild) - " + child_alias + "  " + rd
 
                                 codeToPlace = "{replace_code}\n{code}".format(code=self.trigCodeMergeUpdateDict[rd], replace_code=self.REPLACE_TAG)
                                 sqlUpdate = sqlUpdate.replace(self.REPLACE_TAG, codeToPlace)
-                                #if child_alias == "installation" or child_alias == "meter":
-                                    #if 'qwat_od.vw_node_element' in codeToPlace:
-                                        #print "UPDATE(haschild) - " + child_alias + "  " + rd
 
                                 codeToPlace = "{replace_code}\n{code}".format(code=self.trigCodeMergeDeleteDict[rd], replace_code=self.REPLACE_TAG)
                                 sqlDelete = sqlDelete.replace(self.REPLACE_TAG, codeToPlace)
-                                #if child_alias == "installation" or child_alias == "meter":
-                                    #if 'qwat_od.vw_node_element' in codeToPlace:
-                                        #print "DELETE(haschild) - " + child_alias + "  " + rd
 
                         else:
                             codeToPlace = "{replace_code}\n{code}".format(code=self.trigCodeInsertDict[rd], replace_code=self.REPLACE_TAG)
                             sqlInsert = sqlInsert.replace(self.REPLACE_TAG, codeToPlace)
-                            #if child_alias == "installation" or child_alias == "meter":
-                                #if 'qwat_od.vw_node_element' in codeToPlace:
-                                    #print "INSERT - " + child_alias + "  " + rd
-                                    #print self.trigCodeInsertDict[rd]
 
                             codeToPlace = "{replace_code}\n{code}".format(code=self.trigCodeUpdateDict[rd], replace_code=self.REPLACE_TAG)
                             sqlUpdate = sqlUpdate.replace(self.REPLACE_TAG, codeToPlace)
-                            #if child_alias == "installation" or child_alias == "meter":
-                                #if 'qwat_od.vw_node_element' in codeToPlace:
-                                    #print "UPDATE - " + child_alias + "  " + rd
 
                             codeToPlace = "{replace_code}\n{code}".format(code=self.trigCodeDeleteDict[rd], replace_code=self.REPLACE_TAG)
                             sqlDelete = sqlDelete.replace(self.REPLACE_TAG, codeToPlace)
-                            #if child_alias == "installation" or child_alias == "meter":
-                                #if 'qwat_od.vw_node_element' in codeToPlace:
-                                    #print "DELETE - " + child_alias + "  " + rd
 
                     self.sqlTriggers += "{insert}{update}{delete}".format(insert=sqlInsert, update=sqlUpdate, delete=sqlDelete)
 
