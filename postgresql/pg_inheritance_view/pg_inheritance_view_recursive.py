@@ -177,7 +177,6 @@ class PGInheritanceViewRecursive():
                 self.trigStructInsertDict[definition['alias']] = sqlInsertStructTrigger
 
                 sqlUpdateTrigger, sqlUpdateStructTrigger = self.sql_join_update_trigger(definition, child, trigHeader, genChild, genParent)
-                print sqlUpdateTrigger
                 self.trigCodeUpdateDict[definition['alias']] = sqlUpdateTrigger
                 self.trigStructUpdateDict[definition['alias']] = sqlUpdateStructTrigger
 
