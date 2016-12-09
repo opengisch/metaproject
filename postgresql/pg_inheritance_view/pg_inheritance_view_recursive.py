@@ -277,7 +277,8 @@ class PGInheritanceViewRecursive():
                                 codeToPlace = "{code}\n{replace_code}\n".format(code=self.trigCodeMergeUpdateDict[rd], replace_code=self.REPLACE_TAG)
                                 sqlUpdate = sqlUpdate.replace(self.REPLACE_TAG, codeToPlace)
 
-                                codeToPlace = "{code}\n{replace_code}\n".format(code=self.trigCodeMergeDeleteDict[rd], replace_code=self.REPLACE_TAG)
+                                # Important, in the case of delete, reverse order of code
+                                codeToPlace = "\n{replace_code}\n{code}".format(code=self.trigCodeMergeDeleteDict[rd], replace_code=self.REPLACE_TAG)  
                                 sqlDelete = sqlDelete.replace(self.REPLACE_TAG, codeToPlace)
 
                         else:
@@ -287,7 +288,8 @@ class PGInheritanceViewRecursive():
                             codeToPlace = "{code}\n{replace_code}\n".format(code=self.trigCodeUpdateDict[rd], replace_code=self.REPLACE_TAG)
                             sqlUpdate = sqlUpdate.replace(self.REPLACE_TAG, codeToPlace)
 
-                            codeToPlace = "{code}\n{replace_code}\n".format(code=self.trigCodeDeleteDict[rd], replace_code=self.REPLACE_TAG)
+                            # Important, in the case of delete, reverse order of code
+                            codeToPlace = "\n{replace_code}\n{code}".format(code=self.trigCodeDeleteDict[rd], replace_code=self.REPLACE_TAG)
                             sqlDelete = sqlDelete.replace(self.REPLACE_TAG, codeToPlace)
 
                     self.sqlTriggers += "{insert}{update}{delete}".format(insert=sqlInsert, update=sqlUpdate, delete=sqlDelete)
