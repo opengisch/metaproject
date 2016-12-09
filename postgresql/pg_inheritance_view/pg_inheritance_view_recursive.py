@@ -4,7 +4,7 @@
 import psycopg2, psycopg2.extras
 import yaml
 
-class PGInheritanceView():
+class PGInheritanceViewRecursive():
     def __init__(self, service, definition):
 
         self.conn = psycopg2.connect("service={0}".format(service))
@@ -31,7 +31,7 @@ class PGInheritanceView():
 
 
     def processDefinition(self, definition):
-        # Recursive process to take in account all children, and subchildren...
+        # Recursive process to take in account all children, and subchildren.
         # add alias definition to children to have the same data structure than the top level (parent table)
         if 'children' in definition:
             if 'exec_order' in definition:
@@ -133,15 +133,18 @@ class PGInheritanceView():
                 # Check if the trigger has to be generated in the child view or the parent view
                 # We need to know where the following sql has to be inserted, and to do this, wee need to save the header and footer of the function trigger (and we will fill them later)
 
-                sqlInsertTrigger, sqlInsertStructTrigger = self.sql_join_insert_trigger(definition, child, False, True)
+                trigHeader = False
+                genChild = True
+                genParent = False
+                sqlInsertTrigger, sqlInsertStructTrigger = self.sql_join_insert_trigger(definition, child, trigHeader, genChild, genParent)
                 self.trigCodeInsertDict[child] = sqlInsertTrigger
                 self.trigStructInsertDict[child] = sqlInsertStructTrigger
 
-                sqlUpdateTrigger, sqlUpdateStructTrigger = self.sql_join_update_trigger(definition, child, False, True)
+                sqlUpdateTrigger, sqlUpdateStructTrigger = self.sql_join_update_trigger(definition, child, trigHeader, genChild, genParent)
                 self.trigCodeUpdateDict[child] = sqlUpdateTrigger
                 self.trigStructUpdateDict[child] = sqlUpdateStructTrigger
 
-                sqlDeleteTrigger, sqlDeleteStructTrigger = self.sql_join_delete_trigger(definition, child, False, True)
+                sqlDeleteTrigger, sqlDeleteStructTrigger = self.sql_join_delete_trigger(definition, child, trigHeader, genChild, genParent)
                 self.trigCodeDeleteDict[child] = sqlDeleteTrigger
                 self.trigStructDeleteDict[child] = sqlDeleteStructTrigger
 
@@ -167,15 +170,20 @@ class PGInheritanceView():
 
             # We also need to store single triggers for root
             if 'isroot' in definition and definition['isroot']:
-                sqlInsertTrigger, sqlInsertStructTrigger = self.sql_join_insert_trigger(definition, child, False, False)
+                trigHeader = False
+                genChild = False
+                genParent = True
+
+                sqlInsertTrigger, sqlInsertStructTrigger = self.sql_join_insert_trigger(definition, child, trigHeader, genChild, genParent)
                 self.trigCodeInsertDict[definition['alias']] = sqlInsertTrigger
                 self.trigStructInsertDict[definition['alias']] = sqlInsertStructTrigger
 
-                sqlUpdateTrigger, sqlUpdateStructTrigger = self.sql_join_update_trigger(definition, child, False, False)
+                sqlUpdateTrigger, sqlUpdateStructTrigger = self.sql_join_update_trigger(definition, child, trigHeader, genChild, genParent)
+                print sqlUpdateTrigger
                 self.trigCodeUpdateDict[definition['alias']] = sqlUpdateTrigger
                 self.trigStructUpdateDict[definition['alias']] = sqlUpdateStructTrigger
 
-                sqlDeleteTrigger, sqlDeleteStructTrigger = self.sql_join_delete_trigger(definition, child, False, False)
+                sqlDeleteTrigger, sqlDeleteStructTrigger = self.sql_join_delete_trigger(definition, child, trigHeader, genChild, genParent)
                 self.trigCodeDeleteDict[definition['alias']] = sqlDeleteTrigger
                 self.trigStructDeleteDict[definition['alias']] = sqlDeleteStructTrigger
 
@@ -267,80 +275,75 @@ class PGInheritanceView():
 
                     codeToPlace = ''
                     for rd in relatedDefParent:
-                        print '*************************************************************************** '+ child_alias + '  ( ' + ','.join(relatedDefParent) + ' )' + '  ( ' + ','.join(relatedDefChildren) + ' )'
+                        #print '*************************************************************************** '+ child_alias + '  ( ' + ','.join(relatedDefParent) + ' )' + '  ( ' + ','.join(relatedDefChildren) + ' )'
 
-                        #if rd == child_alias:
-                            #continue
                         # => il faut tester si RD has child, et si les child n ont pas  le  #t. 
                         # Si les enfants ont le #t => alors trigger table, sinon trigger merge ?
                         rdParent, rdChildrens = self.get_def_hierarchy(rd, True)
+                        #rdParent, rdChildrens = self.get_def_hierarchy(rd, False) # TODO  True or false ?
+
+                        #isRd = False
+                        #genParent = True
+                        #genChild = True
+                        #if rd == child_alias:
+                            #isRd = True
+                            #genParent = False
+                            #genChild = False
+
+                        #if rd == "node":
+                            #print rdParent
+                            #print rdChildrens
+
+                        # Check if rd has a parent and childs
+                        #hasParentAndChildren = False
+                        #if rd in rdParent and len(rdChildrens) > 0:
+                            #hasParentAndChildren = True
+
+
                         if len(rdChildrens) > 0:
                             if rd in self.trigCodeMergeInsertDict: 
                                 # We need to take code from trigCodeMergeInsertDict
                                 codeToPlace = "{replace_code}\n{code}".format(code=self.trigCodeMergeInsertDict[rd], replace_code=self.REPLACE_TAG)
                                 sqlInsert = sqlInsert.replace(self.REPLACE_TAG, codeToPlace)
+                                #if child_alias == "installation" or child_alias == "meter":
+                                    #if 'qwat_od.vw_node_element' in codeToPlace:
+                                        #print "INSERT(haschild) - " + child_alias + "  " + rd
 
                                 codeToPlace = "{replace_code}\n{code}".format(code=self.trigCodeMergeUpdateDict[rd], replace_code=self.REPLACE_TAG)
                                 sqlUpdate = sqlUpdate.replace(self.REPLACE_TAG, codeToPlace)
+                                #if child_alias == "installation" or child_alias == "meter":
+                                    #if 'qwat_od.vw_node_element' in codeToPlace:
+                                        #print "UPDATE(haschild) - " + child_alias + "  " + rd
 
                                 codeToPlace = "{replace_code}\n{code}".format(code=self.trigCodeMergeDeleteDict[rd], replace_code=self.REPLACE_TAG)
                                 sqlDelete = sqlDelete.replace(self.REPLACE_TAG, codeToPlace)
+                                #if child_alias == "installation" or child_alias == "meter":
+                                    #if 'qwat_od.vw_node_element' in codeToPlace:
+                                        #print "DELETE(haschild) - " + child_alias + "  " + rd
 
-                                #if child_alias == "installation":
-                                    #print codeToPlace
-                                    
-                                    
                         else:
                             codeToPlace = "{replace_code}\n{code}".format(code=self.trigCodeInsertDict[rd], replace_code=self.REPLACE_TAG)
                             sqlInsert = sqlInsert.replace(self.REPLACE_TAG, codeToPlace)
-                            #if 'qwat_od.vw_node_element' in codeToPlace:
-                                #print self.trigCodeInsertDict
-                                
-                                
+                            #if child_alias == "installation" or child_alias == "meter":
+                                #if 'qwat_od.vw_node_element' in codeToPlace:
+                                    #print "INSERT - " + child_alias + "  " + rd
+                                    #print self.trigCodeInsertDict[rd]
+
                             codeToPlace = "{replace_code}\n{code}".format(code=self.trigCodeUpdateDict[rd], replace_code=self.REPLACE_TAG)
                             sqlUpdate = sqlUpdate.replace(self.REPLACE_TAG, codeToPlace)
+                            #if child_alias == "installation" or child_alias == "meter":
+                                #if 'qwat_od.vw_node_element' in codeToPlace:
+                                    #print "UPDATE - " + child_alias + "  " + rd
 
                             codeToPlace = "{replace_code}\n{code}".format(code=self.trigCodeDeleteDict[rd], replace_code=self.REPLACE_TAG)
                             sqlDelete = sqlDelete.replace(self.REPLACE_TAG, codeToPlace)
-                            if child_alias == "installation":
-                                print rd
-                                #print codeToPlace
-                                #print self.trigCodeDeleteDict[rd]
+                            #if child_alias == "installation" or child_alias == "meter":
+                                #if 'qwat_od.vw_node_element' in codeToPlace:
+                                    #print "DELETE - " + child_alias + "  " + rd
 
                     self.sqlTriggers += "{insert}{update}{delete}".format(insert=sqlInsert, update=sqlUpdate, delete=sqlDelete)
 
-                    for rd in relatedDefChildren:
-                        print '===================================================================== '+ rd + '  ( ' + ','.join(relatedDefChildren) + ' )'
-                        #if rd == 'node':  # TODO TEST TEST TEST
-                            #continue  # TODO add a tag to tell that it is the highest parent
-                        # We need to take code from trigCodeMergeInsertDict
-                        #codeParentToPlace = "\n--TO_REPLACE--\n{code}".format(code=self.trigCodeMergeInsertDict[rd])
-                        #print codeParentToPlace
-
-                        # TODO : we have to check for every child, if there is subchildren
-                        # If no subchildren, don't take the child trig definition, cause the parent's merge one will include the code the all the children
-                        #rdParent, rdChildrens = self.get_def_hierarchy(rd, False)
-                        #print rdParent
-                        #print rdChildrens
-                        #if len(rdChildrens) > 0:
-                        
-                        """
-                        codeToPlace = "\n--TO_REPLACE--\n{code}".format(code=self.trigCodeInsertDict[rd])
-                        sqlInsert = sqlInsert.replace("--TO_REPLACE--", codeToPlace)
-
-                        codeToPlace = "\n--TO_REPLACE--\n{code}".format(code=self.trigCodeUpdateDict[rd])
-                        sqlUpdate = sqlUpdate.replace("--TO_REPLACE--", codeToPlace)
-
-                        codeToPlace = "\n--TO_REPLACE--\n{code}".format(code=self.trigCodeDeleteDict[rd])
-                        sqlDelete = sqlDelete.replace("--TO_REPLACE--", codeToPlace)
-                        """
-
-                    self.sqlTriggers += "{insert}{update}{delete}".format(insert=sqlInsert, update=sqlUpdate, delete=sqlDelete)
                     self.sqlTriggers += self.sqlTriggers.replace(self.REPLACE_TAG, "")
-
-                    #if child_alias == 'installation':   # TEST
-                        #print self.sqlTriggers
-                        #print "-------------------------------------------------"
 
                 self.recursive_triggers(child_def, level)
 
@@ -399,7 +402,7 @@ class PGInheritanceView():
         return sql
 
 
-    def sql_join_insert_trigger(self, definition, child, trig_header, generateChild):
+    def sql_join_insert_trigger(self, definition, child, trig_header, generateChild, generateParent):
         parent_columns = self.getColumns(definition, False)
         child_columns = self.getColumns(definition['children'][child], True)
 
@@ -407,13 +410,6 @@ class PGInheritanceView():
         trigger = "tr_{1}_{2}_insert".format(definition['schema'], definition['alias'], child)
 
         sql = ''
-        """
-        sqlHeader = ''
-        sqlHeader +=  "CREATE OR REPLACE FUNCTION {0}()\n".format(functrigger)
-        sqlHeader += "\tRETURNS trigger AS\n"
-        sqlHeader += "\t$$\n"
-        sqlHeader += "\tBEGIN\n"
-        """
         sqlHeader = self.getTriggerHeader(functrigger)
         if trig_header:
             sql = sqlHeader
@@ -423,69 +419,70 @@ class PGInheritanceView():
             sql += definition['trigger_pre'] + '\n'
 
         # insert into parent
-        if 'pkey_value_create_entry' in definition and definition['pkey_value_create_entry'] is True:
-            # Allow to use function to create entry
-            # the function is defined by pkey_value
-            # if exists, pkey_value is triggered and will return an ID
-            # then, this feature is updated
-            sql += "\t\t-- The function creates or gets a parent row.\n"
-            sql += "\t\tNEW.{0} := {1};\n".format(
-                definition['pkey'],
-                definition['pkey_value'])
-            sql += "\t\t-- If it previously existed with another subtype, it should raise an exception\n"
-            sql += "\t\tIF (SELECT _oid IS NOT NULL FROM \n\t\t\t(\n\t\t\t\t{0}\n\t\t\t) AS foo WHERE _oid = NEW.{1}\n\t\t) THEN\n".format(
-                ' UNION\n\t\t\t\t'.join(
-                    ['SELECT {0} AS _oid FROM {1}'.format(
-                        definition['children'][child]['pkey'],
-                        definition['children'][child]['c_table']
-                    ) for child in definition['children']]
-                ),
-                definition['pkey']
-            )
-            sql += "\t\t\tRAISE EXCEPTION 'Cannot insert {0} as {1} since it already has another subtype. ID: %', NEW.{2};\n".format(
-                definition['alias'],
-                child,
-                definition['pkey']
+        if generateParent:
+            if 'pkey_value_create_entry' in definition and definition['pkey_value_create_entry'] is True:
+                # Allow to use function to create entry
+                # the function is defined by pkey_value
+                # if exists, pkey_value is triggered and will return an ID
+                # then, this feature is updated
+                sql += "\t\t-- The function creates or gets a parent row.\n"
+                sql += "\t\tNEW.{0} := {1};\n".format(
+                    definition['pkey'],
+                    definition['pkey_value'])
+                sql += "\t\t-- If it previously existed with another subtype, it should raise an exception\n"
+                sql += "\t\tIF (SELECT _oid IS NOT NULL FROM \n\t\t\t(\n\t\t\t\t{0}\n\t\t\t) AS foo WHERE _oid = NEW.{1}\n\t\t) THEN\n".format(
+                    ' UNION\n\t\t\t\t'.join(
+                        ['SELECT {0} AS _oid FROM {1}'.format(
+                            definition['children'][child]['pkey'],
+                            definition['children'][child]['c_table']
+                        ) for child in definition['children']]
+                    ),
+                    definition['pkey']
                 )
-            sql += "\t\tEND IF;\n"
-            if 'pkey_value_create_entry_update' in definition and definition['pkey_value_create_entry_update'] is True:
-                sql += "\t\t-- Now update the existing or created feature in parent table\n"
-                sql += "\t\tUPDATE {0} SET\n".format(definition['table'])
+                sql += "\t\t\tRAISE EXCEPTION 'Cannot insert {0} as {1} since it already has another subtype. ID: %', NEW.{2};\n".format(
+                    definition['alias'],
+                    child,
+                    definition['pkey']
+                    )
+                sql += "\t\tEND IF;\n"
+                if 'pkey_value_create_entry_update' in definition and definition['pkey_value_create_entry_update'] is True:
+                    sql += "\t\t-- Now update the existing or created feature in parent table\n"
+                    sql += "\t\tUPDATE {0} SET\n".format(definition['table'])
+                    for col in parent_columns:
+                        col_alter_write = self.column_alter_write(definition, col, False)
+                        col_remap = self.column_remap(definition, col)
+
+                        sql += "\t\t\t\t{0} = ".format(col)
+                        if col_alter_write:
+                            sql += '{0}'.format(col_alter_write)
+                        elif col_remap:
+                            sql += 'NEW.{0}'.format(col_remap)
+                        else:
+                            sql += 'NEW.{0}'.format(col)
+                        sql += ",\n"
+
+                    sql = sql[:-2]+'\n'
+                    sql += "\t\t\tWHERE {0} = NEW.{0};\n".format(definition['pkey'])
+            else:
+                sql += "\t\tINSERT INTO {0} (\n\t\t\t{1}\n\t\t\t{2}\n\t\t) VALUES (\n\t\t\t{3} ".format(
+                    definition['table'],
+                    definition['pkey'],
+                    '\n\t\t\t'.join([", {0}".format(col) for col in parent_columns]),
+                    definition['pkey_value']
+                    )
                 for col in parent_columns:
                     col_alter_write = self.column_alter_write(definition, col, False)
                     col_remap = self.column_remap(definition, col)
 
-                    sql += "\t\t\t\t{0} = ".format(col)
+                    sql += "\n\t\t\t, "
                     if col_alter_write:
                         sql += '{0}'.format(col_alter_write)
                     elif col_remap:
                         sql += 'NEW.{0}'.format(col_remap)
                     else:
                         sql += 'NEW.{0}'.format(col)
-                    sql += ",\n"
 
-                sql = sql[:-2]+'\n'
-                sql += "\t\t\tWHERE {0} = NEW.{0};\n".format(definition['pkey'])
-        else:
-            sql += "\t\tINSERT INTO {0} (\n\t\t\t{1}\n\t\t\t{2}\n\t\t) VALUES (\n\t\t\t{3} ".format(
-                definition['table'],
-                definition['pkey'],
-                '\n\t\t\t'.join([", {0}".format(col) for col in parent_columns]),
-                definition['pkey_value']
-                )
-            for col in parent_columns:
-                col_alter_write = self.column_alter_write(definition, col, False)
-                col_remap = self.column_remap(definition, col)
-
-                sql += "\n\t\t\t, "
-                if col_alter_write:
-                    sql += '{0}'.format(col_alter_write)
-                elif col_remap:
-                    sql += 'NEW.{0}'.format(col_remap)
-                else:
-                    sql += 'NEW.{0}'.format(col)
-
-            sql += "\n\t\t) RETURNING {0} INTO NEW.{0};\n".format(definition['pkey'])
+                sql += "\n\t\t) RETURNING {0} INTO NEW.{0};\n".format(definition['pkey'])
 
         if generateChild:
             # insert into child
@@ -531,7 +528,7 @@ class PGInheritanceView():
 
         return sql, sqlStruct
 
-    def sql_join_update_trigger(self, definition, child, trig_header, generateChild):
+    def sql_join_update_trigger(self, definition, child, trig_header, generateChild, generateParent):
         parent_columns = self.getColumns(definition, False)
         child_columns = self.getColumns(definition['children'][child], True)
 
@@ -539,13 +536,6 @@ class PGInheritanceView():
         trigger = "tr_{1}_{2}_update".format(definition['schema'],    definition['alias'], child)
 
         sql = ''
-        """
-        sqlHeader = ''
-        sqlHeader +=  "\nCREATE OR REPLACE FUNCTION {0}()".format(functrigger)
-        sqlHeader += "\n\tRETURNS trigger AS"
-        sqlHeader += "\n\t$$"
-        sqlHeader += "\n\tBEGIN"
-        """
         sqlHeader = self.getTriggerHeader(functrigger)
         if trig_header:
             sql = sqlHeader
@@ -555,7 +545,16 @@ class PGInheritanceView():
             sql += definition['trigger_pre'] + '\n'
 
         i = 0
-        for element in (definition, definition['children'][child]):
+
+        elements = (definition, definition['children'][child])
+        if not generateParent:
+            elements = (definition['children'][child],)
+            i = 1
+        if not generateChild:
+            elements = (definition,)
+
+        #for element in (definition, definition['children'][child]):
+        for element in elements:
             tableName = element['table']
             if generateChild and 'c_table' in element:
                 tableName = element['c_table']
@@ -604,31 +603,27 @@ class PGInheritanceView():
         return sql, sqlStruct
 
 
-    def sql_join_delete_trigger(self, definition, child, trig_header, generateChild):
+    def sql_join_delete_trigger(self, definition, child, trig_header, generateChild, generateParent):
 
         functrigger = "{0}.ft_{1}_{2}_delete".format(definition['schema'],    definition['alias'], child)
         trigger = "tr_{1}_{2}_delete".format(definition['schema'],    definition['alias'], child)
 
         sql = ''
-        """
-        sqlHeader = ''
-        sqlHeader +=  "\nCREATE OR REPLACE FUNCTION {0}()".format(functrigger)
-        sqlHeader += "\n\tRETURNS trigger AS"
-        sqlHeader += "\n\t$$"
-        sqlHeader += "\n\tBEGIN"
-        """
         sqlHeader = self.getTriggerHeader(functrigger)
         if trig_header:
             sql = sqlHeader
 
-        if "custom_delete" in definition['children'][child]:
-            sql += "\n\t\t{0};".format(definition['children'][child]['custom_delete'])
-        else:
-            sql += "\n\t\tDELETE FROM {0} WHERE {1} = OLD.{1};".format(definition['children'][child]['c_table'], definition['children'][child]['pkey'])
-        if "custom_delete" in definition:
-            sql += "\n\t\t{0};".format(definition['custom_delete'])
-        else:
-            sql += "\n\t\tDELETE FROM {0} WHERE {1} = OLD.{1};".format(definition['table'], definition['pkey'])
+        if generateChild:
+            if "custom_delete" in definition['children'][child]:
+                sql += "\n\t\t{0};".format(definition['children'][child]['custom_delete'])
+            else:
+                sql += "\n\t\tDELETE FROM {0} WHERE {1} = OLD.{1};".format(definition['children'][child]['c_table'], definition['children'][child]['pkey'])
+
+        if generateParent:
+            if "custom_delete" in definition:
+                sql += "\n\t\t{0};".format(definition['custom_delete'])
+            else:
+                sql += "\n\t\tDELETE FROM {0} WHERE {1} = OLD.{1};".format(definition['table'], definition['pkey'])
 
         sqlFooter = ''
         sqlFooter += "\n\t\tRETURN NULL;\n"
@@ -762,12 +757,6 @@ class PGInheritanceView():
         trigger = "tr_{0}_insert".format(definition['merge_view']['name'])
 
         sql = ''
-        """
-        sqlHeader =  "CREATE OR REPLACE FUNCTION {0}()\n".format(functrigger)
-        sqlHeader += "\tRETURNS trigger AS\n"
-        sqlHeader += "\t$$\n"
-        sqlHeader += "\tBEGIN\n"
-        """
         sqlHeader = self.getTriggerHeader(functrigger)
         if trig_header:
             sql = sqlHeader
@@ -880,22 +869,6 @@ class PGInheritanceView():
         sql += "\n\t\t ELSE NULL;"
         sql += "\n\t END CASE;\n"
 
-        """
-        # end trigger function
-        sqlFooter = ''
-        sqlFooter += "\t\tRETURN NEW;\n"
-        sqlFooter += "\tEND;\n"
-        sqlFooter += "\t$$\n"
-        sqlFooter += "\tLANGUAGE plpgsql;\n\n"
-
-        # create trigger
-        sqlFooter += "DROP TRIGGER IF EXISTS {0} ON {1}.{2};\n".format(trigger, definition['schema'], definition['merge_view']['name'])
-        sqlFooter += "CREATE TRIGGER {0}\n".format(trigger)
-        sqlFooter += "\tINSTEAD OF INSERT\n"
-        sqlFooter += "\tON {0}.{1}\n".format(definition['schema'], definition['merge_view']['name'])
-        sqlFooter += "\tFOR EACH ROW\n"
-        sqlFooter += "\tEXECUTE PROCEDURE {0}();\n\n".format(functrigger)
-        """
         sqlFooter = self.getTriggerFooter(definition, trigger, functrigger, 'INSERT', 'NEW')
 
         if trig_header:
@@ -915,12 +888,6 @@ class PGInheritanceView():
         trigger = "tr_{0}_update".format(definition['merge_view']['name'])
 
         sql = ''
-        """
-        sqlHeader =  "\nCREATE OR REPLACE FUNCTION {0}()".format(functrigger)
-        sqlHeader += "\n\tRETURNS trigger AS"
-        sqlHeader += "\n\t$$"
-        sqlHeader += "\n\tBEGIN"
-        """
         sqlHeader = self.getTriggerHeader(functrigger)
         if trig_header:
             sql = sqlHeader
@@ -1041,21 +1008,6 @@ class PGInheritanceView():
                 sql += "WHERE {0} = OLD.{1};".format(definition['children'][child]['pkey'], definition['pkey'])
         sql += "\n\tEND CASE;\n"
 
-        """
-        sqlFooter = ''
-        sqlFooter += "\n\tRETURN NEW;"
-        sqlFooter += "\n\tEND;"
-        sqlFooter += "\n\t$$"
-        sqlFooter += "\n\tLANGUAGE plpgsql;\n"
-
-        # update trigger
-        sqlFooter += "DROP TRIGGER IF EXISTS {0} ON {1}.{2};\n".format(trigger, definition['schema'], definition['merge_view']['name'])
-        sqlFooter += "CREATE TRIGGER {0}\n".format(trigger)
-        sqlFooter += "\tINSTEAD OF UPDATE\n"
-        sqlFooter += "\tON {0}.{1}\n".format(definition['schema'], definition['merge_view']['name'])
-        sqlFooter += "\tFOR EACH ROW\n"
-        sqlFooter += "\tEXECUTE PROCEDURE {0}();\n\n".format(functrigger)
-        """
         sqlFooter = self.getTriggerFooter(definition, trigger, functrigger, 'UPDATE', 'NEW')
 
         if trig_header:
@@ -1073,12 +1025,6 @@ class PGInheritanceView():
         trigger = "tr_{0}_delete".format(definition['merge_view']['name'])
 
         sql = ''
-        """
-        sqlHeader =  "\nCREATE OR REPLACE FUNCTION {0}()".format(functrigger)
-        sqlHeader += "\n\tRETURNS trigger AS"
-        sqlHeader += "\n\t$$"
-        sqlHeader += "\n\tBEGIN"
-        """
         sqlHeader = self.getTriggerHeader(functrigger)
         if trig_header:
             sql = sqlHeader
@@ -1100,21 +1046,6 @@ class PGInheritanceView():
         else:
             sql += "\n\tDELETE FROM {0} WHERE {1} = OLD.{1};".format(definition['table'], definition['pkey'])
 
-        """
-        sqlFooter = ''
-        sqlFooter += "\n\tRETURN NULL;\n"
-        sqlFooter += "\tEND;\n"
-        sqlFooter += "\t$$\n"
-        sqlFooter += "\tLANGUAGE plpgsql;\n\n"
-
-        # delete trigger
-        sqlFooter += "DROP TRIGGER IF EXISTS {0} ON {1}.{2};\n".format(trigger, definition['schema'], definition['merge_view']['name'])
-        sqlFooter += "CREATE TRIGGER {0}\n".format(trigger)
-        sqlFooter += "\tINSTEAD OF DELETE\n"
-        sqlFooter += "\tON {0}.{1}\n".format(definition['schema'], definition['merge_view']['name'])
-        sqlFooter += "\tFOR EACH ROW\n"
-        sqlFooter += "\tEXECUTE PROCEDURE {0}();\n\n".format(functrigger)
-        """
         sqlFooter = self.getTriggerFooter(definition, trigger, functrigger, 'DELETE', 'NULL')
 
         if trig_header:
