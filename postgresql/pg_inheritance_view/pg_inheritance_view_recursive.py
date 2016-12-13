@@ -1,10 +1,13 @@
 #!/usr/bin/env python
 
 
-import psycopg2, psycopg2.extras
+import psycopg2
+import psycopg2.extras
 import yaml
 
+
 class PGInheritanceViewRecursive():
+
     def __init__(self, service, definition):
 
         self.conn = psycopg2.connect("service={0}".format(service))
@@ -26,13 +29,13 @@ class PGInheritanceViewRecursive():
             self.allow_type_change = self.definition['merge_view']['allow_type_change']
         """
         # Recursive process of definition
-        self.nbExecution = 0 # Number of executions
+        self.nbExecution = 0  # Number of executions
         self.processDefinition(self.definition)
-
 
     def processDefinition(self, definition):
         # Recursive process to take in account all children, and subchildren.
-        # add alias definition to children to have the same data structure than the top level (parent table)
+        # add alias definition to children to have the same data structure than
+        # the top level (parent table)
         if 'children' in definition:
             if 'exec_order' in definition:
                 if self.nbExecution < definition['exec_order']:
@@ -42,12 +45,16 @@ class PGInheritanceViewRecursive():
                 definition['children'][child]['alias'] = child
                 self.processDefinition(definition['children'][child])
 
-        # defines if a item can be inserted in the parent table only (not any sub-type). Default: true.
-        definition['allow_parent_only'] = definition['allow_parent_only'] if 'allow_parent_only' in definition else True
-        # defines if switching between sub-type is allowed in the merge_view. Default: false
+        # defines if a item can be inserted in the parent table only (not any
+        # sub-type). Default: true.
+        definition['allow_parent_only'] = definition[
+            'allow_parent_only'] if 'allow_parent_only' in definition else True
+        # defines if switching between sub-type is allowed in the merge_view.
+        # Default: false
         definition['allow_type_change'] = False
         if 'merge_view' in definition and 'allow_type_change' in definition['merge_view']:
-            definition['allow_type_change'] = definition['merge_view']['allow_type_change']
+            definition['allow_type_change'] = definition[
+                'merge_view']['allow_type_change']
 
     def executeSql(self, sql):
         self.cur.execute(sql)
@@ -57,7 +64,8 @@ class PGInheritanceViewRecursive():
         definitionFieldName = 'table'
         if childField:
             definitionFieldName = 'c_table'
-        self.cur.execute("SELECT attname FROM pg_attribute WHERE attrelid = '{0}'::regclass AND attisdropped IS NOT TRUE AND attnum > 0 ORDER BY attnum ASC".format(element[definitionFieldName]))
+        self.cur.execute("SELECT attname FROM pg_attribute WHERE attrelid = '{0}'::regclass AND attisdropped IS NOT TRUE AND attnum > 0 ORDER BY attnum ASC".format(
+            element[definitionFieldName]))
         pg_fields = self.cur.fetchall()
         pg_fields = [field[0] for field in pg_fields]
         pg_fields.remove(element['pkey'])
@@ -88,15 +96,16 @@ class PGInheritanceViewRecursive():
             return None
 
     def join_view_name(self, definition, child, schema_qualified=True):
-        name =  '{0}.'.format(definition['schema']) if schema_qualified else ''
-        name +='vw_{0}_{1}'.format(definition['alias'], child)
+        name = '{0}.'.format(definition['schema']) if schema_qualified else ''
+        name += 'vw_{0}_{1}'.format(definition['alias'], child)
         return name
 
     def sql_all(self):
         # Get order for sql execution
         self.listExecDefinition = []
-        for i in range(1, self.nbExecution+1):
-            definition = self.getDefinitionByExecOrder(self.definition, self.listExecDefinition, i)
+        for i in range(1, self.nbExecution + 1):
+            definition = self.getDefinitionByExecOrder(
+                self.definition, self.listExecDefinition, i)
 
         sql = ''
         self.trigCodeInsertDict = {}
@@ -117,7 +126,8 @@ class PGInheritanceViewRecursive():
 
         for definition in self.listExecDefinition:
             sqlViews = ''
-            #if 'generate_child_views' in definition and definition['generate_child_views']:
+            # if 'generate_child_views' in definition and
+            # definition['generate_child_views']:
             for child in definition['children']:
                 if 'generate_view' in definition['children'][child] and definition['children'][child]['generate_view'] is not True:
                     # We don't generate a view for these
@@ -131,20 +141,25 @@ class PGInheritanceViewRecursive():
             sqlTriggers = ''
             for child in definition['children']:
                 # Check if the trigger has to be generated in the child view or the parent view
-                # We need to know where the following sql has to be inserted, and to do this, wee need to save the header and footer of the function trigger (and we will fill them later)
+                # We need to know where the following sql has to be inserted,
+                # and to do this, wee need to save the header and footer of the
+                # function trigger (and we will fill them later)
 
                 trigHeader = False
                 genChild = True
                 genParent = False
-                sqlInsertTrigger, sqlInsertStructTrigger = self.sql_join_insert_trigger(definition, child, trigHeader, genChild, genParent)
+                sqlInsertTrigger, sqlInsertStructTrigger = self.sql_join_insert_trigger(
+                    definition, child, trigHeader, genChild, genParent)
                 self.trigCodeInsertDict[child] = sqlInsertTrigger
                 self.trigStructInsertDict[child] = sqlInsertStructTrigger
 
-                sqlUpdateTrigger, sqlUpdateStructTrigger = self.sql_join_update_trigger(definition, child, trigHeader, genChild, genParent)
+                sqlUpdateTrigger, sqlUpdateStructTrigger = self.sql_join_update_trigger(
+                    definition, child, trigHeader, genChild, genParent)
                 self.trigCodeUpdateDict[child] = sqlUpdateTrigger
                 self.trigStructUpdateDict[child] = sqlUpdateStructTrigger
 
-                sqlDeleteTrigger, sqlDeleteStructTrigger = self.sql_join_delete_trigger(definition, child, trigHeader, genChild, genParent)
+                sqlDeleteTrigger, sqlDeleteStructTrigger = self.sql_join_delete_trigger(
+                    definition, child, trigHeader, genChild, genParent)
                 self.trigCodeDeleteDict[child] = sqlDeleteTrigger
                 self.trigStructDeleteDict[child] = sqlDeleteStructTrigger
 
@@ -172,18 +187,23 @@ class PGInheritanceViewRecursive():
                 genChild = False
                 genParent = True
 
-                sqlInsertTrigger, sqlInsertStructTrigger = self.sql_join_insert_trigger(definition, child, trigHeader, genChild, genParent)
+                sqlInsertTrigger, sqlInsertStructTrigger = self.sql_join_insert_trigger(
+                    definition, child, trigHeader, genChild, genParent)
                 self.trigCodeInsertDict[definition['alias']] = sqlInsertTrigger
-                self.trigStructInsertDict[definition['alias']] = sqlInsertStructTrigger
+                self.trigStructInsertDict[definition[
+                    'alias']] = sqlInsertStructTrigger
 
-                sqlUpdateTrigger, sqlUpdateStructTrigger = self.sql_join_update_trigger(definition, child, trigHeader, genChild, genParent)
+                sqlUpdateTrigger, sqlUpdateStructTrigger = self.sql_join_update_trigger(
+                    definition, child, trigHeader, genChild, genParent)
                 self.trigCodeUpdateDict[definition['alias']] = sqlUpdateTrigger
-                self.trigStructUpdateDict[definition['alias']] = sqlUpdateStructTrigger
+                self.trigStructUpdateDict[definition[
+                    'alias']] = sqlUpdateStructTrigger
 
-                sqlDeleteTrigger, sqlDeleteStructTrigger = self.sql_join_delete_trigger(definition, child, trigHeader, genChild, genParent)
+                sqlDeleteTrigger, sqlDeleteStructTrigger = self.sql_join_delete_trigger(
+                    definition, child, trigHeader, genChild, genParent)
                 self.trigCodeDeleteDict[definition['alias']] = sqlDeleteTrigger
-                self.trigStructDeleteDict[definition['alias']] = sqlDeleteStructTrigger
-
+                self.trigStructDeleteDict[definition[
+                    'alias']] = sqlDeleteStructTrigger
 
         # Now, generate triggers for each view that needs it
         self.hierarchy = []
@@ -206,7 +226,7 @@ class PGInheritanceViewRecursive():
             parents = definition['alias'] + trigHere
         else:
             parents = parents + ',' + definition['alias'] + trigHere
-        self.hierarchy.append(parents);
+        self.hierarchy.append(parents)
         if 'children' in definition:
             for child in definition['children']:
                 child_def = definition['children'][child]
@@ -219,13 +239,17 @@ class PGInheritanceViewRecursive():
         relatedDefChildr = []
         triTag = '#t'
         if trigAssociated:
-            alias = alias + triTag  # If we arrive here, that means the alias has a trig_here tag associated
+            # If we arrive here, that means the alias has a trig_here tag
+            # associated
+            alias = alias + triTag
         for h in self.hierarchy:
             tabHierarchy = h.split(',')
             if alias in tabHierarchy:
                 pos = tabHierarchy.index(alias)
-                if pos == (len(tabHierarchy) - 1):  # If it is at the end of a hierarchy, then take all the parents and build the triggers with that (ex: element, node)
-                    if gotParents == False :
+                # If it is at the end of a hierarchy, then take all the parents
+                # and build the triggers with that (ex: element, node)
+                if pos == (len(tabHierarchy) - 1):
+                    if gotParents == False:
                         relatedDef = list(tabHierarchy)
                         relatedDefParent = list(tabHierarchy)
                         gotParents = True
@@ -235,10 +259,11 @@ class PGInheritanceViewRecursive():
                         relatedDef = tabHierarchy[:pos]
                         relatedDefParent = tabHierarchy[:pos]
                         gotParents = True
-                    if tabHierarchy[pos+1].find(triTag) == -1: # Check if children has trig_here tag too
+                    # Check if children has trig_here tag too
+                    if tabHierarchy[pos + 1].find(triTag) == -1:
                         # If no, add it to the list
-                        relatedDef.append(tabHierarchy[pos+1])
-                        relatedDefChildr.append(tabHierarchy[pos+1])
+                        relatedDef.append(tabHierarchy[pos + 1])
+                        relatedDefChildr.append(tabHierarchy[pos + 1])
         relatedDef = [d.replace(triTag, '') for d in relatedDef]
         relatedDefParent = [d.replace(triTag, '') for d in relatedDefParent]
         relatedDefChildr = [d.replace(triTag, '') for d in relatedDefChildr]
@@ -251,8 +276,11 @@ class PGInheritanceViewRecursive():
                 child_alias = child_def['alias']
                 if 'trig_here' in child_def and child_def['trig_here'] is True:
                     viewname = self.join_view_name(definition, child)
-                    # Then generate the trigger at that level, and it must contains the code of the current def, and the one of the childrens, and the parent !
-                    relatedDefParent, relatedDefChildren = self.get_def_hierarchy(child_alias, True)
+                    # Then generate the trigger at that level, and it must
+                    # contains the code of the current def, and the one of the
+                    # childrens, and the parent !
+                    relatedDefParent, relatedDefChildren = self.get_def_hierarchy(
+                        child_alias, True)
 
                     sqlInsert = ''
                     sqlUpdate = ''
@@ -266,35 +294,53 @@ class PGInheritanceViewRecursive():
                     codeToPlace = ''
                     for rd in relatedDefParent:
 
-                        rdParent, rdChildrens = self.get_def_hierarchy(rd, True)
+                        rdParent, rdChildrens = self.get_def_hierarchy(
+                            rd, True)
 
                         if len(rdChildrens) > 0:
-                            if rd in self.trigCodeMergeInsertDict: 
-                                # We need to take code from trigCodeMergeInsertDict
-                                codeToPlace = "{code}\n{replace_code}\n".format(code=self.trigCodeMergeInsertDict[rd], replace_code=self.REPLACE_TAG)
-                                sqlInsert = sqlInsert.replace(self.REPLACE_TAG, codeToPlace)
+                            if rd in self.trigCodeMergeInsertDict:
+                                # We need to take code from
+                                # trigCodeMergeInsertDict
+                                codeToPlace = "{code}\n{replace_code}\n".format(
+                                    code=self.trigCodeMergeInsertDict[rd], replace_code=self.REPLACE_TAG)
+                                sqlInsert = sqlInsert.replace(
+                                    self.REPLACE_TAG, codeToPlace)
 
-                                codeToPlace = "{code}\n{replace_code}\n".format(code=self.trigCodeMergeUpdateDict[rd], replace_code=self.REPLACE_TAG)
-                                sqlUpdate = sqlUpdate.replace(self.REPLACE_TAG, codeToPlace)
+                                codeToPlace = "{code}\n{replace_code}\n".format(
+                                    code=self.trigCodeMergeUpdateDict[rd], replace_code=self.REPLACE_TAG)
+                                sqlUpdate = sqlUpdate.replace(
+                                    self.REPLACE_TAG, codeToPlace)
 
-                                # Important, in the case of delete, reverse order of code
-                                codeToPlace = "\n{replace_code}\n{code}".format(code=self.trigCodeMergeDeleteDict[rd], replace_code=self.REPLACE_TAG)  
-                                sqlDelete = sqlDelete.replace(self.REPLACE_TAG, codeToPlace)
+                                # Important, in the case of delete, reverse
+                                # order of code
+                                codeToPlace = "\n{replace_code}\n{code}".format(
+                                    code=self.trigCodeMergeDeleteDict[rd], replace_code=self.REPLACE_TAG)
+                                sqlDelete = sqlDelete.replace(
+                                    self.REPLACE_TAG, codeToPlace)
 
                         else:
-                            codeToPlace = "{code}\n{replace_code}\n".format(code=self.trigCodeInsertDict[rd], replace_code=self.REPLACE_TAG)
-                            sqlInsert = sqlInsert.replace(self.REPLACE_TAG, codeToPlace)
+                            codeToPlace = "{code}\n{replace_code}\n".format(
+                                code=self.trigCodeInsertDict[rd], replace_code=self.REPLACE_TAG)
+                            sqlInsert = sqlInsert.replace(
+                                self.REPLACE_TAG, codeToPlace)
 
-                            codeToPlace = "{code}\n{replace_code}\n".format(code=self.trigCodeUpdateDict[rd], replace_code=self.REPLACE_TAG)
-                            sqlUpdate = sqlUpdate.replace(self.REPLACE_TAG, codeToPlace)
+                            codeToPlace = "{code}\n{replace_code}\n".format(
+                                code=self.trigCodeUpdateDict[rd], replace_code=self.REPLACE_TAG)
+                            sqlUpdate = sqlUpdate.replace(
+                                self.REPLACE_TAG, codeToPlace)
 
-                            # Important, in the case of delete, reverse order of code
-                            codeToPlace = "\n{replace_code}\n{code}".format(code=self.trigCodeDeleteDict[rd], replace_code=self.REPLACE_TAG)
-                            sqlDelete = sqlDelete.replace(self.REPLACE_TAG, codeToPlace)
+                            # Important, in the case of delete, reverse order
+                            # of code
+                            codeToPlace = "\n{replace_code}\n{code}".format(
+                                code=self.trigCodeDeleteDict[rd], replace_code=self.REPLACE_TAG)
+                            sqlDelete = sqlDelete.replace(
+                                self.REPLACE_TAG, codeToPlace)
 
-                    self.sqlTriggers += "{insert}{update}{delete}".format(insert=sqlInsert, update=sqlUpdate, delete=sqlDelete)
+                    self.sqlTriggers += "{insert}{update}{delete}".format(
+                        insert=sqlInsert, update=sqlUpdate, delete=sqlDelete)
 
-                    self.sqlTriggers += self.sqlTriggers.replace(self.REPLACE_TAG, "")
+                    self.sqlTriggers += self.sqlTriggers.replace(
+                        self.REPLACE_TAG, "")
 
                 self.recursive_triggers(child_def, level)
 
@@ -303,21 +349,26 @@ class PGInheritanceViewRecursive():
             listExecDefinition.append(definition)
         elif 'children' in definition:
             for child in definition['children']:
-                self.getDefinitionByExecOrder(definition['children'][child], listExecDefinition, order)
+                self.getDefinitionByExecOrder(
+                    definition['children'][child], listExecDefinition, order)
 
     def sql_type(self, definition):
-        sql = "DROP TYPE IF EXISTS {0}.{1}_type CASCADE;".format(definition['schema'], definition['alias'])
+        sql = "DROP TYPE IF EXISTS {0}.{1}_type CASCADE;".format(
+            definition['schema'], definition['alias'])
         sql += "\nCREATE TYPE {0}.{1}_type AS ENUM ({2} {3} );\n\n".format(
             definition['schema'],
             definition['alias'],
             #" '{0}',".format(self.definition['alias']) if self.allow_parent_only is True else "",
-            " '{0}',".format(definition['alias']) if definition['allow_parent_only'] is True else "",
-            ', '.join(["'{0}'".format(child) for child in definition['children']])
-            )
+            " '{0}',".format(definition['alias']) if definition[
+                'allow_parent_only'] is True else "",
+            ', '.join(["'{0}'".format(child)
+                       for child in definition['children']])
+        )
         return sql
 
     def sql_join_view(self, definition, child):
-        sql = "CREATE OR REPLACE VIEW {0} AS\n\tSELECT\n".format(self.join_view_name(definition, child))
+        sql = "CREATE OR REPLACE VIEW {0} AS\n\tSELECT\n".format(
+            self.join_view_name(definition, child))
 
         sql += "\t\t{0}.{1}".format(definition['alias'], definition['pkey'])
 
@@ -336,7 +387,7 @@ class PGInheritanceViewRecursive():
                     if not col_remap:
                         sql += " AS {0}".format(col)
                 else:
-                    sql += "{0}.{1}".format(element['alias'],col)
+                    sql += "{0}.{1}".format(element['alias'], col)
                 if col_remap:
                     sql += " AS {0}".format(col_remap)
             i += 1
@@ -349,16 +400,17 @@ class PGInheritanceViewRecursive():
             definition['alias'],
             definition['children'][child]['pkey'],
             definition['pkey']
-            )
+        )
         return sql
-
 
     def sql_join_insert_trigger(self, definition, child, trig_header, generateChild, generateParent):
         parent_columns = self.getColumns(definition, False)
         child_columns = self.getColumns(definition['children'][child], True)
 
-        functrigger = "{0}.ft_{1}_{2}_insert".format(definition['schema'], definition['alias'], child)
-        trigger = "tr_{1}_{2}_insert".format(definition['schema'], definition['alias'], child)
+        functrigger = "{0}.ft_{1}_{2}_insert".format(
+            definition['schema'], definition['alias'], child)
+        trigger = "tr_{1}_{2}_insert".format(
+            definition['schema'], definition['alias'], child)
 
         sql = ''
         sqlHeader = self.getTriggerHeader(functrigger)
@@ -394,13 +446,14 @@ class PGInheritanceViewRecursive():
                     definition['alias'],
                     child,
                     definition['pkey']
-                    )
+                )
                 sql += "\t\tEND IF;\n"
                 if 'pkey_value_create_entry_update' in definition and definition['pkey_value_create_entry_update'] is True:
                     sql += "\t\t-- Now update the existing or created feature in parent table\n"
                     sql += "\t\tUPDATE {0} SET\n".format(definition['table'])
                     for col in parent_columns:
-                        col_alter_write = self.column_alter_write(definition, col, False)
+                        col_alter_write = self.column_alter_write(
+                            definition, col, False)
                         col_remap = self.column_remap(definition, col)
 
                         sql += "\t\t\t\t{0} = ".format(col)
@@ -412,17 +465,20 @@ class PGInheritanceViewRecursive():
                             sql += 'NEW.{0}'.format(col)
                         sql += ",\n"
 
-                    sql = sql[:-2]+'\n'
-                    sql += "\t\t\tWHERE {0} = NEW.{0};\n".format(definition['pkey'])
+                    sql = sql[:-2] + '\n'
+                    sql += "\t\t\tWHERE {0} = NEW.{0};\n".format(
+                        definition['pkey'])
             else:
                 sql += "\t\tINSERT INTO {0} (\n\t\t\t{1}\n\t\t\t{2}\n\t\t) VALUES (\n\t\t\t{3} ".format(
                     definition['table'],
                     definition['pkey'],
-                    '\n\t\t\t'.join([", {0}".format(col) for col in parent_columns]),
+                    '\n\t\t\t'.join([", {0}".format(col)
+                                     for col in parent_columns]),
                     definition['pkey_value']
-                    )
+                )
                 for col in parent_columns:
-                    col_alter_write = self.column_alter_write(definition, col, False)
+                    col_alter_write = self.column_alter_write(
+                        definition, col, False)
                     col_remap = self.column_remap(definition, col)
 
                     sql += "\n\t\t\t, "
@@ -433,19 +489,23 @@ class PGInheritanceViewRecursive():
                     else:
                         sql += 'NEW.{0}'.format(col)
 
-                sql += "\n\t\t) RETURNING {0} INTO NEW.{0};\n".format(definition['pkey'])
+                sql += "\n\t\t) RETURNING {0} INTO NEW.{0};\n".format(definition[
+                                                                      'pkey'])
 
         if generateChild:
             # insert into child
             sql += "\n\t\tINSERT INTO {0} (\n\t\t\t{1}\n\t\t\t{2}\n\t\t) VALUES (\n\t\t\tNEW.{3} ".format(
                 definition['children'][child]['c_table'],
                 definition['children'][child]['pkey'],
-                '\n\t\t\t'.join([", {0}".format(col) for col in child_columns]),
+                '\n\t\t\t'.join([", {0}".format(col)
+                                 for col in child_columns]),
                 definition['pkey']
-                )
+            )
             for col in child_columns:
-                col_alter_write = self.column_alter_write(definition['children'][child], col, True)
-                col_remap = self.column_remap(definition['children'][child], col)
+                col_alter_write = self.column_alter_write(
+                    definition['children'][child], col, True)
+                col_remap = self.column_remap(
+                    definition['children'][child], col)
 
                 sql += "\n\t\t\t, "
                 if col_alter_write:
@@ -465,17 +525,20 @@ class PGInheritanceViewRecursive():
         sqlFooter += "\tLANGUAGE plpgsql;\n\n"
 
         # create trigger
-        sqlFooter += "DROP TRIGGER IF EXISTS {0} ON {1};\n".format(trigger, self.join_view_name(definition, child))
+        sqlFooter += "DROP TRIGGER IF EXISTS {0} ON {1};\n".format(
+            trigger, self.join_view_name(definition, child))
         sqlFooter += "CREATE TRIGGER {0}\n".format(trigger)
         sqlFooter += "\tINSTEAD OF INSERT\n"
-        sqlFooter += "\tON {0}\n".format(self.join_view_name(definition, child))
+        sqlFooter += "\tON {0}\n".format(
+            self.join_view_name(definition, child))
         sqlFooter += "\tFOR EACH ROW\n"
         sqlFooter += "\tEXECUTE PROCEDURE {0}();\n\n".format(functrigger)
 
         if trig_header:
             sql += sqlFooter
 
-        sqlStruct = "{head}\n{replace_code}\n{foot}".format(head=sqlHeader, foot=sqlFooter, replace_code=self.REPLACE_TAG)
+        sqlStruct = "{head}\n{replace_code}\n{foot}".format(
+            head=sqlHeader, foot=sqlFooter, replace_code=self.REPLACE_TAG)
 
         return sql, sqlStruct
 
@@ -483,8 +546,10 @@ class PGInheritanceViewRecursive():
         parent_columns = self.getColumns(definition, False)
         child_columns = self.getColumns(definition['children'][child], True)
 
-        functrigger = "{0}.ft_{1}_{2}_update".format(definition['schema'],    definition['alias'], child)
-        trigger = "tr_{1}_{2}_update".format(definition['schema'],    definition['alias'], child)
+        functrigger = "{0}.ft_{1}_{2}_update".format(
+            definition['schema'],    definition['alias'], child)
+        trigger = "tr_{1}_{2}_update".format(
+            definition['schema'],    definition['alias'], child)
 
         sql = ''
         sqlHeader = self.getTriggerHeader(functrigger)
@@ -504,7 +569,7 @@ class PGInheritanceViewRecursive():
         if not generateChild:
             elements = (definition,)
 
-        #for element in (definition, definition['children'][child]):
+        # for element in (definition, definition['children'][child]):
         for element in elements:
             tableName = element['table']
             if generateChild and 'c_table' in element:
@@ -517,7 +582,8 @@ class PGInheritanceViewRecursive():
             if len(cols) > 0:
                 sql += "\n\tUPDATE {0} SET".format(tableName)
                 for col in cols:
-                    col_alter_write = self.column_alter_write(element, col, forChild)
+                    col_alter_write = self.column_alter_write(
+                        element, col, forChild)
                     col_remap = self.column_remap(element, col)
 
                     sql += "\n\t\t\t{0} = ".format(col)
@@ -529,7 +595,7 @@ class PGInheritanceViewRecursive():
                         sql += 'NEW.{0}'.format(col)
                     sql += ","
 
-                sql = sql[:-1] # extra comma
+                sql = sql[:-1]  # extra comma
                 sql += "\n\t\tWHERE {0} = OLD.{0};\n".format(element['pkey'])
             i += 1
 
@@ -540,24 +606,28 @@ class PGInheritanceViewRecursive():
         sqlFooter += "\tLANGUAGE plpgsql;\n\n"
 
         # create trigger
-        sqlFooter += "DROP TRIGGER IF EXISTS {0} ON {1};\n".format(trigger, self.join_view_name(definition, child))
+        sqlFooter += "DROP TRIGGER IF EXISTS {0} ON {1};\n".format(
+            trigger, self.join_view_name(definition, child))
         sqlFooter += "CREATE TRIGGER {0}\n".format(trigger)
         sqlFooter += "\tINSTEAD OF UPDATE\n"
-        sqlFooter += "\tON {0}\n".format(self.join_view_name(definition, child))
+        sqlFooter += "\tON {0}\n".format(
+            self.join_view_name(definition, child))
         sqlFooter += "\tFOR EACH ROW\n"
         sqlFooter += "\tEXECUTE PROCEDURE {0}();\n\n".format(functrigger)
         if trig_header:
             sql += sqlFooter
 
-        sqlStruct = "{head}\n{replace_code}\n{foot}".format(head=sqlHeader, foot=sqlFooter, replace_code=self.REPLACE_TAG)
+        sqlStruct = "{head}\n{replace_code}\n{foot}".format(
+            head=sqlHeader, foot=sqlFooter, replace_code=self.REPLACE_TAG)
 
         return sql, sqlStruct
 
-
     def sql_join_delete_trigger(self, definition, child, trig_header, generateChild, generateParent):
 
-        functrigger = "{0}.ft_{1}_{2}_delete".format(definition['schema'],    definition['alias'], child)
-        trigger = "tr_{1}_{2}_delete".format(definition['schema'],    definition['alias'], child)
+        functrigger = "{0}.ft_{1}_{2}_delete".format(
+            definition['schema'],    definition['alias'], child)
+        trigger = "tr_{1}_{2}_delete".format(
+            definition['schema'],    definition['alias'], child)
 
         sql = ''
         sqlHeader = self.getTriggerHeader(functrigger)
@@ -566,15 +636,18 @@ class PGInheritanceViewRecursive():
 
         if generateChild:
             if "custom_delete" in definition['children'][child]:
-                sql += "\n\t\t{0};".format(definition['children'][child]['custom_delete'])
+                sql += "\n\t\t{0};".format(definition['children']
+                                           [child]['custom_delete'])
             else:
-                sql += "\n\t\tDELETE FROM {0} WHERE {1} = OLD.{1};".format(definition['children'][child]['c_table'], definition['children'][child]['pkey'])
+                sql += "\n\t\tDELETE FROM {0} WHERE {1} = OLD.{1};".format(
+                    definition['children'][child]['c_table'], definition['children'][child]['pkey'])
 
         if generateParent:
             if "custom_delete" in definition:
                 sql += "\n\t\t{0};".format(definition['custom_delete'])
             else:
-                sql += "\n\t\tDELETE FROM {0} WHERE {1} = OLD.{1};".format(definition['table'], definition['pkey'])
+                sql += "\n\t\tDELETE FROM {0} WHERE {1} = OLD.{1};".format(
+                    definition['table'], definition['pkey'])
 
         sqlFooter = ''
         sqlFooter += "\n\t\tRETURN NULL;\n"
@@ -583,19 +656,21 @@ class PGInheritanceViewRecursive():
         sqlFooter += "\tLANGUAGE plpgsql;\n\n"
 
         # create trigger
-        sqlFooter += "DROP TRIGGER IF EXISTS {0} ON {1};\n".format(trigger, self.join_view_name(definition, child))
+        sqlFooter += "DROP TRIGGER IF EXISTS {0} ON {1};\n".format(
+            trigger, self.join_view_name(definition, child))
         sqlFooter += "CREATE TRIGGER {0}\n".format(trigger)
         sqlFooter += "\tINSTEAD OF DELETE\n"
-        sqlFooter += "\tON {0}\n".format(self.join_view_name(definition, child))
+        sqlFooter += "\tON {0}\n".format(
+            self.join_view_name(definition, child))
         sqlFooter += "\tFOR EACH ROW\n"
         sqlFooter += "\tEXECUTE PROCEDURE {0}();\n\n".format(functrigger)
         if trig_header:
             sql += sqlFooter
 
-        sqlStruct = "{head}\n{replace_code}\n{foot}".format(head=sqlHeader, foot=sqlFooter, replace_code=self.REPLACE_TAG)
+        sqlStruct = "{head}\n{replace_code}\n{foot}".format(
+            head=sqlHeader, foot=sqlFooter, replace_code=self.REPLACE_TAG)
 
         return sql, sqlStruct
-
 
     def sql_merge_view(self, definition):
         if 'merge_view' not in definition:
@@ -603,23 +678,24 @@ class PGInheritanceViewRecursive():
 
         sql = self.sql_type(definition)
 
-        sql += "CREATE OR REPLACE VIEW {0}.{1} AS\n\tSELECT\n\t\tCASE\n".format(definition['schema'],definition['merge_view']['name'])
+        sql += "CREATE OR REPLACE VIEW {0}.{1} AS\n\tSELECT\n\t\tCASE\n".format(
+            definition['schema'], definition['merge_view']['name'])
         for child in definition['children']:
             sql += "\t\t\tWHEN {0}.{1} IS NOT NULL THEN '{0}'::{2}.{3}_type\n".format(
                 child,
                 definition['children'][child]['pkey'],
                 definition['schema'],
                 definition['alias']
-                )
+            )
         sql += "\t\t\tELSE '{0}'::{1}.{0}_type\n".format(
             definition['alias'],
             definition['schema']
-            )
+        )
         sql += "\t\tEND AS {0}_type,\n".format(definition['alias'])
-        sql += "\t\t{0}.{1}".format(definition['alias'],definition['pkey'])
+        sql += "\t\t{0}.{1}".format(definition['alias'], definition['pkey'])
 
         # parent columns
-        parent_columns = self.getColumns (definition, False)
+        parent_columns = self.getColumns(definition, False)
         for col in parent_columns:
             col_alter_read = self.column_alter_read(definition, col, False)
             col_remap = self.column_remap(definition, col)
@@ -636,34 +712,40 @@ class PGInheritanceViewRecursive():
         # additional columns
         if 'additional_columns' in definition['merge_view']:
             for col in definition['merge_view']['additional_columns']:
-                sql += "\n\t\t, {0} AS {1}".format(definition['merge_view']['additional_columns'][col], col)
+                sql += "\n\t\t, {0} AS {1}".format(
+                    definition['merge_view']['additional_columns'][col], col)
 
         # merge columns
         if 'merge_columns' in definition['merge_view']:
             for column_alias in definition['merge_view']['merge_columns']:
                 sql += "\n\t\t, CASE"
-                for table_alias in  definition['merge_view']['merge_columns'][column_alias]:
+                for table_alias in definition['merge_view']['merge_columns'][column_alias]:
                     sql += "\n\t\t\tWHEN {0}.{1} IS NOT NULL THEN {0}.{2}".format(
                         table_alias,
                         definition['children'][table_alias]['pkey'],
-                        definition['merge_view']['merge_columns'][column_alias][table_alias]
-                        )
+                        definition['merge_view']['merge_columns'][
+                            column_alias][table_alias]
+                    )
                 sql += "\n\t\t\tELSE NULL"
                 sql += "\n\t\tEND AS {0}".format(column_alias)
 
         # children tables
         for child in definition['children']:
-            child_columns = self.getColumns(definition['children'][child], True)
+            child_columns = self.getColumns(
+                definition['children'][child], True)
             # remove merged columns
             if 'merge_columns' in definition['merge_view']:
                 for column_alias in definition['merge_view']['merge_columns']:
                     for table_alias in definition['merge_view']['merge_columns'][column_alias]:
                         if table_alias == child:
-                            child_columns.remove(definition['merge_view']['merge_columns'][column_alias][child])
+                            child_columns.remove(definition['merge_view'][
+                                                 'merge_columns'][column_alias][child])
             # add columns
             for col in child_columns:
-                col_alter_read = self.column_alter_read(definition['children'][child], col, True)
-                col_remap = self.column_remap(definition['children'][child], col)
+                col_alter_read = self.column_alter_read(
+                    definition['children'][child], col, True)
+                col_remap = self.column_remap(
+                    definition['children'][child], col)
                 sql += "\n\t\t, "
                 if col_alter_read:
                     sql += "{0}".format(col_alter_read)
@@ -675,7 +757,8 @@ class PGInheritanceViewRecursive():
                     sql += " AS {0}".format(col_remap)
 
         # from
-        sql += "\n\tFROM {0} {1}".format(definition['table'], definition['alias'])
+        sql += "\n\tFROM {0} {1}".format(
+            definition['table'], definition['alias'])
         for child in definition['children']:
             sql += "\n\t\tLEFT JOIN {0} {1} ON {2}.{3} = {1}.{4}".format(
                 definition['children'][child]['c_table'],
@@ -683,20 +766,20 @@ class PGInheritanceViewRecursive():
                 definition['alias'],
                 definition['pkey'],
                 definition['children'][child]['pkey']
-                )
+            )
         if 'additional_joins' in definition['merge_view']:
             for join in definition['merge_view']['additional_joins']:
                 sql += "\n\t\t{0} JOIN {1} {2} ON {3}.{4} = {2}.{5}".format(
-                definition['merge_view']['additional_joins'][join]['type'],
-                definition['merge_view']['additional_joins'][join]['table'],
-                join,
-                definition['alias'],
-                definition['merge_view']['additional_joins'][join]['fkey'],
-                definition['merge_view']['additional_joins'][join]['key']
+                    definition['merge_view']['additional_joins'][join]['type'],
+                    definition['merge_view'][
+                        'additional_joins'][join]['table'],
+                    join,
+                    definition['alias'],
+                    definition['merge_view']['additional_joins'][join]['fkey'],
+                    definition['merge_view']['additional_joins'][join]['key']
                 )
         sql += ";\n\n"
         return sql
-
 
     def sql_merge_insert_trigger(self, definition, trig_header):
         if 'merge_view' not in definition:
@@ -704,7 +787,8 @@ class PGInheritanceViewRecursive():
 
         parent_columns = self.getColumns(definition, False)
 
-        functrigger = "{0}.ft_{1}_insert".format(definition['schema'], definition['merge_view']['name'])
+        functrigger = "{0}.ft_{1}_insert".format(
+            definition['schema'], definition['merge_view']['name'])
         trigger = "tr_{0}_insert".format(definition['merge_view']['name'])
 
         sql = ''
@@ -740,13 +824,14 @@ class PGInheritanceViewRecursive():
                 definition['alias'],
                 child,
                 definition['pkey']
-                )
+            )
             sql += "\t\tEND IF;\n"
             if 'pkey_value_create_entry' in definition and definition['pkey_value_create_entry'] is True:
                 sql += "\t\t-- Now update the existing or created feature in parent table\n"
                 sql += "\t\tUPDATE {0} SET\n".format(definition['table'])
                 for col in parent_columns:
-                    col_alter_write = self.column_alter_write(definition, col, False)
+                    col_alter_write = self.column_alter_write(
+                        definition, col, False)
                     col_remap = self.column_remap(definition, col)
                     if not col_remap:
                         col_remap = col
@@ -760,18 +845,21 @@ class PGInheritanceViewRecursive():
                         sql += 'NEW.{0}'.format(col)
                     sql += ",\n"
 
-                sql = sql[:-2]+'\n'
-                sql += "\t\t\tWHERE {0} = NEW.{0};\n".format(definition['pkey'])
+                sql = sql[:-2] + '\n'
+                sql += "\t\t\tWHERE {0} = NEW.{0};\n".format(
+                    definition['pkey'])
         # standard insert
         else:
             sql += "\t\tINSERT INTO {0} (\n\t\t\t{1}\n\t\t\t{2}\n\t\t) VALUES (\n\t\t\t{3} ".format(
                 definition['table'],
                 definition['pkey'],
-                '\n\t\t\t'.join([", {0}".format(col) for col in parent_columns]),
+                '\n\t\t\t'.join([", {0}".format(col)
+                                 for col in parent_columns]),
                 definition['pkey_value']
-                )
+            )
             for col in parent_columns:
-                col_alter_write = self.column_alter_write(definition, col, False)
+                col_alter_write = self.column_alter_write(
+                    definition, col, False)
                 col_remap = self.column_remap(definition, col)
 
                 sql += "\n\t\t\t, "
@@ -782,12 +870,14 @@ class PGInheritanceViewRecursive():
                 else:
                     sql += 'NEW.{0}'.format(col)
 
-            sql += "\n\t\t) RETURNING {0} INTO NEW.{0};\n".format(definition['pkey'])
+            sql += "\n\t\t) RETURNING {0} INTO NEW.{0};\n".format(definition[
+                                                                  'pkey'])
 
         # insert into children
         sql += "\n\tCASE"
         for child in definition['children']:
-            child_columns = self.getColumns(definition['children'][child], True)
+            child_columns = self.getColumns(
+                definition['children'][child], True)
 
             sql += "\n\t\tWHEN NEW.{0}_type::{1}.{0}_type = '{2}'::{1}.{0}_type\n\t\t\tTHEN INSERT INTO {3} (\n\t\t\t\t{4} {5}\n\t\t\t) VALUES (\n\t\t\t\tNEW.{6}".format(
                 definition['alias'],
@@ -795,13 +885,16 @@ class PGInheritanceViewRecursive():
                 child,
                 definition['children'][child]['c_table'],
                 definition['children'][child]['pkey'],
-                ''.join(["\n\t\t\t\t, {0}".format(col) for col in child_columns]),
+                ''.join(["\n\t\t\t\t, {0}".format(col)
+                         for col in child_columns]),
                 definition['pkey']
-                )
+            )
 
             for col in child_columns:
-                col_alter_write = self.column_alter_write(definition['children'][child], col, True)
-                col_remap = self.column_remap(definition['children'][child], col)
+                col_alter_write = self.column_alter_write(
+                    definition['children'][child], col, True)
+                col_remap = self.column_remap(
+                    definition['children'][child], col)
                 if not col_remap:
                     col_remap = col
                     # replace remapped column by merged column alias if exists
@@ -820,12 +913,14 @@ class PGInheritanceViewRecursive():
         sql += "\n\t\t ELSE NULL;"
         sql += "\n\t END CASE;\n"
 
-        sqlFooter = self.getTriggerFooter(definition, trigger, functrigger, 'INSERT', 'NEW')
+        sqlFooter = self.getTriggerFooter(
+            definition, trigger, functrigger, 'INSERT', 'NEW')
 
         if trig_header:
             sql += sqlFooter
 
-        sqlStruct = "{head}\n{replace_code}\n{foot}".format(head=sqlHeader, foot=sqlFooter, replace_code=self.REPLACE_TAG)
+        sqlStruct = "{head}\n{replace_code}\n{foot}".format(
+            head=sqlHeader, foot=sqlFooter, replace_code=self.REPLACE_TAG)
 
         return sql, sqlStruct
 
@@ -835,7 +930,8 @@ class PGInheritanceViewRecursive():
 
         parent_columns = self.getColumns(definition, False)
 
-        functrigger = "{0}.ft_{1}_update".format(definition['schema'], definition['merge_view']['name'])
+        functrigger = "{0}.ft_{1}_update".format(
+            definition['schema'], definition['merge_view']['name'])
         trigger = "tr_{0}_update".format(definition['merge_view']['name'])
 
         sql = ''
@@ -852,7 +948,8 @@ class PGInheritanceViewRecursive():
         if len(cols) > 0:
             sql += "\n\tUPDATE {0} SET".format(definition['table'])
             for col in cols:
-                col_alter_write = self.column_alter_write(definition, col, False)
+                col_alter_write = self.column_alter_write(
+                    definition, col, False)
                 col_remap = self.column_remap(definition, col)
 
                 sql += "\n\t\t\t{0} = ".format(col)
@@ -864,45 +961,56 @@ class PGInheritanceViewRecursive():
                     sql += 'NEW.{0}'.format(col)
                 sql += ","
 
-            sql = sql[:-1] # extra comma
+            sql = sql[:-1]  # extra comma
             sql += "\n\t\tWHERE {0} = OLD.{0};".format(definition['pkey'])
 
         # do not allow parent only insert
-        #if not self.allow_parent_only:
+        # if not self.allow_parent_only:
         if not definition['allow_parent_only']:
-            sql += "\n\tIF NEW.{0}_type IS NULL THEN".format(definition['alias'])
-            sql += "\n\t\tRAISE EXCEPTION 'Insert on {0} only is not allowed.' USING HINT = 'It must have a sub-type.';".format(definition['alias'])
+            sql += "\n\tIF NEW.{0}_type IS NULL THEN".format(definition[
+                                                             'alias'])
+            sql += "\n\t\tRAISE EXCEPTION 'Insert on {0} only is not allowed.' USING HINT = 'It must have a sub-type.';".format(definition[
+                                                                                                                                'alias'])
             sql += "\n\tEND IF;"
 
         # detect if type has changed
         sql += "\n\t-- detect if type has changed"
-        sql += "\n\tIF OLD.{0}_type <> NEW.{0}_type::{1}.{0}_type THEN".format(definition['alias'], definition['schema'])
+        sql += "\n\tIF OLD.{0}_type <> NEW.{0}_type::{1}.{0}_type THEN".format(
+            definition['alias'], definition['schema'])
         # allow type change
-        #if self.allow_type_change:
+        # if self.allow_type_change:
         if definition['allow_type_change']:
             sql += "\n\t\t-- delete old sub type"
             sql += "\n\t\tCASE"
             for child in definition['children']:
-                sql += "\n\t\t\tWHEN OLD.{0}_type::{1}.{0}_type = '{2}'::{1}.{0}_type".format(definition['alias'], definition['schema'], child)
-                sql += "\n\t\t\t\tTHEN DELETE FROM {0} WHERE {1} = OLD.{1};".format(definition['children'][child]['c_table'], definition['children'][child]['pkey'])
+                sql += "\n\t\t\tWHEN OLD.{0}_type::{1}.{0}_type = '{2}'::{1}.{0}_type".format(
+                    definition['alias'], definition['schema'], child)
+                sql += "\n\t\t\t\tTHEN DELETE FROM {0} WHERE {1} = OLD.{1};".format(
+                    definition['children'][child]['c_table'], definition['children'][child]['pkey'])
             sql += "\n\t\tEND CASE;"
             sql += "\n\t\t-- insert new sub type"
             sql += "\n\t\tCASE"
             for child in definition['children']:
-                child_columns = self.getColumns(definition['children'][child], True)
-                sql += "\n\t\t\tWHEN NEW.{0}_type::{1}.{0}_type = '{2}'::{1}.{0}_type".format(definition['alias'], definition['schema'], child)
+                child_columns = self.getColumns(
+                    definition['children'][child], True)
+                sql += "\n\t\t\tWHEN NEW.{0}_type::{1}.{0}_type = '{2}'::{1}.{0}_type".format(
+                    definition['alias'], definition['schema'], child)
                 sql += "\n\t\t\t\tTHEN INSERT INTO {0} (\n\t\t\t\t\t\t{1} {2} \n\t\t\t\t\t) VALUES (\n\t\t\t\t\t\tOLD.{3}".format(
                     definition['children'][child]['c_table'],
                     definition['children'][child]['pkey'],
-                    ''.join(["\n\t\t\t\t\t\t, {0}".format(col) for col in child_columns]),
+                    ''.join(["\n\t\t\t\t\t\t, {0}".format(col)
+                             for col in child_columns]),
                     definition['pkey']
-                    )
+                )
                 for col in child_columns:
-                    col_alter_write = self.column_alter_write(definition['children'][child], col, True)
-                    col_remap = self.column_remap(definition['children'][child], col)
+                    col_alter_write = self.column_alter_write(
+                        definition['children'][child], col, True)
+                    col_remap = self.column_remap(
+                        definition['children'][child], col)
                     if not col_remap:
                         col_remap = col
-                        # replace remapped column by merged column alias if exists
+                        # replace remapped column by merged column alias if
+                        # exists
                         if 'merge_columns' in definition['merge_view']:
                             for column_alias in definition['merge_view']['merge_columns']:
                                 for table_alias in definition['merge_view']['merge_columns'][column_alias]:
@@ -920,29 +1028,36 @@ class PGInheritanceViewRecursive():
             sql += "\n\t\tRETURN NEW;"
         # forbid type change
         else:
-            sql += "\n\t\tRAISE EXCEPTION 'Type change not allowed for {0}'".format(definition['alias'])
-            sql += "\n\t\t\tUSING HINT = 'You cannot switch from ' || OLD.{0}_type || ' to ' || NEW.{0}_type; ".format(definition['alias'])
+            sql += "\n\t\tRAISE EXCEPTION 'Type change not allowed for {0}'".format(definition[
+                                                                                    'alias'])
+            sql += "\n\t\t\tUSING HINT = 'You cannot switch from ' || OLD.{0}_type || ' to ' || NEW.{0}_type; ".format(definition[
+                                                                                                                       'alias'])
         sql += "\n\tEND IF;"
 
         # update child
         sql += "\n\tCASE"
         for child in definition['children']:
-            child_columns = self.getColumns(definition['children'][child], True)
+            child_columns = self.getColumns(
+                definition['children'][child], True)
             sql += "\n\tWHEN NEW.{0}_type::{1}.{0}_type = '{2}'::{1}.{0}_type\n\t\tTHEN ".format(
                 definition['alias'],
                 definition['schema'],
                 child
-                )
+            )
             if len(child_columns) == 0:
                 sql += "\n\t\tNULL;"
             else:
-                sql += "UPDATE {0} SET\n\t\t\t".format(definition['children'][child]['c_table'])
+                sql += "UPDATE {0} SET\n\t\t\t".format(
+                    definition['children'][child]['c_table'])
                 for col in child_columns:
-                    col_alter_write = self.column_alter_write(definition['children'][child], col, True)
-                    col_remap = self.column_remap(definition['children'][child], col)
+                    col_alter_write = self.column_alter_write(
+                        definition['children'][child], col, True)
+                    col_remap = self.column_remap(
+                        definition['children'][child], col)
                     if not col_remap:
                         col_remap = col
-                        # replace remapped column by merged column alias if exists
+                        # replace remapped column by merged column alias if
+                        # exists
                         if 'merge_columns' in definition['merge_view']:
                             for column_alias in definition['merge_view']['merge_columns']:
                                 for table_alias in definition['merge_view']['merge_columns'][column_alias]:
@@ -956,15 +1071,18 @@ class PGInheritanceViewRecursive():
                         sql += 'NEW.{0}'.format(col_remap)
                     sql += "\n\t\t\t, "
                 sql = sql[:-3]
-                sql += "WHERE {0} = OLD.{1};".format(definition['children'][child]['pkey'], definition['pkey'])
+                sql += "WHERE {0} = OLD.{1};".format(definition['children'][child][
+                                                     'pkey'], definition['pkey'])
         sql += "\n\tEND CASE;\n"
 
-        sqlFooter = self.getTriggerFooter(definition, trigger, functrigger, 'UPDATE', 'NEW')
+        sqlFooter = self.getTriggerFooter(
+            definition, trigger, functrigger, 'UPDATE', 'NEW')
 
         if trig_header:
             sql += sqlFooter
 
-        sqlStruct = "{head}\n{replace_code}\n{foot}".format(head=sqlHeader, foot=sqlFooter, replace_code=self.REPLACE_TAG)
+        sqlStruct = "{head}\n{replace_code}\n{foot}".format(
+            head=sqlHeader, foot=sqlFooter, replace_code=self.REPLACE_TAG)
 
         return sql, sqlStruct
 
@@ -972,7 +1090,8 @@ class PGInheritanceViewRecursive():
         if 'merge_view' not in definition:
             return ''
 
-        functrigger = "{0}.ft_{1}_delete".format(definition['schema'], definition['merge_view']['name'])
+        functrigger = "{0}.ft_{1}_delete".format(
+            definition['schema'], definition['merge_view']['name'])
         trigger = "tr_{0}_delete".format(definition['merge_view']['name'])
 
         sql = ''
@@ -986,28 +1105,33 @@ class PGInheritanceViewRecursive():
                 definition['alias'],
                 definition['schema'],
                 child
-                )
+            )
             if "custom_delete" in definition['children'][child]:
-                sql += "\n\t\t\t{0};".format(definition['children'][child]['custom_delete'])
+                sql += "\n\t\t\t{0};".format(definition['children'][
+                                             child]['custom_delete'])
             else:
-                sql += "\n\t\t\tDELETE FROM {0} WHERE {1} = OLD.{1};".format(definition['children'][child]['c_table'], definition['children'][child]['pkey'])
+                sql += "\n\t\t\tDELETE FROM {0} WHERE {1} = OLD.{1};".format(
+                    definition['children'][child]['c_table'], definition['children'][child]['pkey'])
         sql += "\n\tEND CASE;"
         if "custom_delete" in definition:
             sql += "\n\t{0};".format(definition['custom_delete'])
         else:
-            sql += "\n\tDELETE FROM {0} WHERE {1} = OLD.{1};".format(definition['table'], definition['pkey'])
+            sql += "\n\tDELETE FROM {0} WHERE {1} = OLD.{1};".format(
+                definition['table'], definition['pkey'])
 
-        sqlFooter = self.getTriggerFooter(definition, trigger, functrigger, 'DELETE', 'NULL')
+        sqlFooter = self.getTriggerFooter(
+            definition, trigger, functrigger, 'DELETE', 'NULL')
 
         if trig_header:
             sql += sqlFooter
 
-        sqlStruct = "{head}\n{replace_code}\n{foot}".format(head=sqlHeader, foot=sqlFooter, replace_code=self.REPLACE_TAG)
+        sqlStruct = "{head}\n{replace_code}\n{foot}".format(
+            head=sqlHeader, foot=sqlFooter, replace_code=self.REPLACE_TAG)
 
         return sql, sqlStruct
 
     def getTriggerHeader(self, functrigger):
-        sqlHeader =  "\nCREATE OR REPLACE FUNCTION {0}()".format(functrigger)
+        sqlHeader = "\nCREATE OR REPLACE FUNCTION {0}()".format(functrigger)
         sqlHeader += "\n\tRETURNS trigger AS"
         sqlHeader += "\n\t$$"
         sqlHeader += "\n\tBEGIN"
@@ -1021,10 +1145,12 @@ class PGInheritanceViewRecursive():
         sqlFooter += "\tLANGUAGE plpgsql;\n\n"
 
         # delete trigger
-        sqlFooter += "DROP TRIGGER IF EXISTS {0} ON {1}.{2};\n".format(trigger, definition['schema'], definition['merge_view']['name'])
+        sqlFooter += "DROP TRIGGER IF EXISTS {0} ON {1}.{2};\n".format(
+            trigger, definition['schema'], definition['merge_view']['name'])
         sqlFooter += "CREATE TRIGGER {0}\n".format(trigger)
         sqlFooter += "\tINSTEAD OF {mode}\n".format(mode=mode)
-        sqlFooter += "\tON {0}.{1}\n".format(definition['schema'], definition['merge_view']['name'])
+        sqlFooter += "\tON {0}.{1}\n".format(
+            definition['schema'], definition['merge_view']['name'])
         sqlFooter += "\tFOR EACH ROW\n"
         sqlFooter += "\tEXECUTE PROCEDURE {0}();\n\n".format(functrigger)
 

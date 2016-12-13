@@ -3,6 +3,7 @@ import psycopg2.extras
 import json
 from collections import OrderedDict
 
+
 def add_field(fields_dict, field_info):
     fieldname = field_info['column_name']
     nullable = field_info['is_nullable']
@@ -102,7 +103,6 @@ for c in pg_constraints:
         tables[table_name]['inherits'] = foreign_table_name
 
     tables[table_name]['fields'][column_name]['references'] = fk
-
 
 
 # Assemble the metaproject information
