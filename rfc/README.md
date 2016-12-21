@@ -30,13 +30,13 @@ The project node contains base information about a project which is not specific
 
 The project will be read from the key project
 
-```
+```.yaml
 project:
   crs: 21781
   name: My Project
   legend:
     - Covers:
-      <<: *lyr_qgep_vw_qgep_cover
+      <<: *lyr_qgep_vw_qgep_cover # Load a predefined, generated layer
     - A layer group:
       - baselayer:
         source: baselayer.shp
@@ -48,7 +48,7 @@ project:
 The legend consists of a list where each element is either a layer or a layer group.
 If an element is a key/value pair it's interpreted as a layer, if it's a list, it's treated as a layer group.
 
-```
+```.yaml
 project:
   legend:
   - layer:
@@ -68,7 +68,7 @@ This is the "main entry point" for loading layers. While it's possible to specif
 
 The CRS is specified as a simple EPSG number
 
-```
+```.yaml
 project:
   crs: 21781
 ```
@@ -81,14 +81,14 @@ Further requirements like custom CRSes are not planned at the moment but may be 
 
 The initial extent can be specified as an array of xmin, xmax, ymin, ymax
 
-```
+```.yaml
 project:
   extent: [643700, 649410, 180300, 184200]
 ```
     
 or a layer can be specified which will be queried for the extent. Just specify the layer id as string.
 
-```
+```.yaml
 project:
   extent: layer_id
 ```
@@ -105,7 +105,7 @@ To be done
 
 Custom properties are simple key value pairs and mapped as such
 
-```
+```.yaml
 project:
   custom_properties:
     my_plugin/initial_value/of_something: 400
@@ -123,7 +123,7 @@ once came to a similar conclusion. *Cogito ergo sum*.
 
 Is a simple boolean flag
 
-```
+```.yaml
 project:
   autotransaction: True
 ```
@@ -132,7 +132,7 @@ project:
 
 Each layer and its properties can be configured. Layers are placed under the legend node.
 
-```
+```.yaml
 project:
   legend:
     - Wastebins:
@@ -144,7 +144,7 @@ project:
 
 To keep the project more readable it is often more practical to just reference them in the legend node and define them somewhere else, probably even in a separate file.
 
-```
+```.yaml
 project:
   legend:
     - Wastebins:
@@ -166,7 +166,7 @@ basemap: &basemap
 
 Each layer may have a layer id defined. In case it's undefined, an id will be generated. Layer ids need to be unique within a project.
 
-```
+```.yaml
 layername:
   id: my_unique_name
 ```
@@ -177,14 +177,14 @@ The datasource defines where the data is loaded from and in case it is supported
 
 **Note:** It is possible that in the future there will be more intelligence introduced to choose an appropriate provider.
 
-```
+```.yaml
 layername:
   source: /home/mkuhn/data/mydata.shp
 ```
 
 It is possible to specify a specific data provider to define where a layer is loaded from.
 
-```
+```.yaml
 layername:
   source: service='pg_qgep' key='"obj_id"' estimatedmetadata=true table="qgep"."od_cover" sql=
   provider: postgres
@@ -206,7 +206,7 @@ In this case, the source string depends on the provider in use.
 
 The style node is a simple reference to a QML file which is looked up on a path relative to the path of the current file.
 
-```
+```.yaml
 layer:
   symbology: covers_symbology.qml
 ```
@@ -221,7 +221,7 @@ From this file, ONLY the symbology definitions are loaded. Labeling, widgets, jo
 
 The style node is a simple reference to a QML file which is looked up on a path relative to the path of the current file.
 
-```
+```.yaml
 layer:
   labels: covers_labels.qml
 ```
@@ -236,7 +236,7 @@ From this file, ONLY the label definitions are loaded. Symbology, widgets, joins
 
 Translation of labels (often) needs to translate strings from the database what makes it more complex than translation of strings from this project definition. Translation of labels is done with the use of regular expressions.
 
-```
+```.yaml
 layer:
   labeling:
     source: xyz.qml
@@ -256,7 +256,7 @@ This will cause two things to happen:
 
 #### Actions
 
-```
+```.yaml
 layer:
   actions:
     - name: Party
@@ -282,7 +282,7 @@ layer:
 
 #### Custom layer properties
 
-```
+```.yaml
 layer:
   properties:
     pluginX/configOption: 1
@@ -291,7 +291,7 @@ layer:
 
 #### Feature title
 
-```
+```.yaml
 layer:
   feature_title: COALESCE("identifier", 'N/A')
 ```
@@ -305,7 +305,7 @@ are manually written control files.
 
 An example for a yaml file created from a postgres database can look like this:
 
-```
+```.yaml
 schema: qgep
 tables:
   od_wastewater_structure:
@@ -330,7 +330,7 @@ loads a yaml file. The structure defined by the included file will be loaded
 before the current file is loaded. The current file has the possibility to overwrite
 any of the specifications in the source file.
 
-```
+```.yaml
 layers:
   fields:
     - id:
@@ -363,7 +363,7 @@ Project Description
 A project description file contains metainformation for the project to generate
 as well as a legend.
 
-```
+```.yaml
 include: qgep_db.yaml # Load the qgep db 
 
 project:
