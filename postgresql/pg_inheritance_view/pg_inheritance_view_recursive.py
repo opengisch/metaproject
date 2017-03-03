@@ -16,18 +16,6 @@ class PGInheritanceViewRecursive():
         # Read configuration
         self.definition = yaml.load(definition)
 
-        """
-        # add alias definition to children to have the same data structure than the top level (parent table)
-        for child in self.definition['children']:
-            self.definition['children'][child]['alias'] = child
-
-        # defines if a item can be inserted in the parent table only (not any sub-type). Default: true.
-        self.allow_parent_only = self.definition['allow_parent_only'] if 'allow_parent_only' in self.definition else True
-        # defines if switching between sub-type is allowed in the merge_view. Default: false
-        self.allow_type_change = False
-        if 'merge_view' in self.definition and 'allow_type_change' in self.definition['merge_view']:
-            self.allow_type_change = self.definition['merge_view']['allow_type_change']
-        """
         # Recursive process of definition
         self.nbExecution = 0  # Number of executions
         self.processDefinition(self.definition)
@@ -978,7 +966,6 @@ class PGInheritanceViewRecursive():
         sql += "\n\tIF OLD.{0}_type <> NEW.{0}_type::{1}.{0}_type THEN".format(
             definition['alias'], definition['schema'])
         # allow type change
-        # if self.allow_type_change:
         if definition['allow_type_change']:
             sql += "\n\t\t-- delete old sub type"
             sql += "\n\t\tCASE"
