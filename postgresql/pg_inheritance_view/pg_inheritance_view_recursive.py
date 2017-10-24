@@ -808,9 +808,8 @@ class PGInheritanceViewRecursive():
                 ),
                 definition['pkey']
             )
-            sql += "\t\t\tRAISE EXCEPTION 'Cannot insert {0} as {1} since it already has another subtype. ID: %', NEW.{2};\n".format(
+            sql += "\t\t\tRAISE EXCEPTION 'Cannot insert {0} since it already has another subtype. ID: %', NEW.{1};\n".format(
                 definition['alias'],
-                child,
                 definition['pkey']
             )
             sql += "\t\tEND IF;\n"
