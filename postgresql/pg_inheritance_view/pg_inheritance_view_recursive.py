@@ -1061,7 +1061,7 @@ class PGInheritanceViewRecursive():
                 sql = sql[:-3]
                 sql += "WHERE {0} = OLD.{1};".format(definition['children'][child][
                                                      'pkey'], definition['pkey'])
-        sql += "\n\tELSE NULL;"
+        sql += "\n\t\tELSE NULL;"
         sql += "\n\tEND CASE;\n"
 
         sqlFooter = self.getTriggerFooter(
