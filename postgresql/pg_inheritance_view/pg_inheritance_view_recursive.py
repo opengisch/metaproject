@@ -973,6 +973,7 @@ class PGInheritanceViewRecursive():
                     definition['alias'], definition['schema'], child)
                 sql += "\n\t\t\t\tTHEN DELETE FROM {0} WHERE {1} = OLD.{1};".format(
                     definition['children'][child]['c_table'], definition['children'][child]['pkey'])
+            sql += "\n\t\t\tELSE NULL;"
             sql += "\n\t\tEND CASE;"
             sql += "\n\t\t-- insert new sub type"
             sql += "\n\t\tCASE"
@@ -1009,6 +1010,7 @@ class PGInheritanceViewRecursive():
                     else:
                         sql += 'NEW.{0}'.format(col_remap)
                 sql += "\n\t\t\t\t\t);"
+            sql += "\n\t\t\tELSE NULL;"
             sql += "\n\t\tEND CASE;"
             sql += "\n\t\t-- return now as child has been updated"
             sql += "\n\t\tRETURN NEW;"
@@ -1059,6 +1061,7 @@ class PGInheritanceViewRecursive():
                 sql = sql[:-3]
                 sql += "WHERE {0} = OLD.{1};".format(definition['children'][child][
                                                      'pkey'], definition['pkey'])
+        sql += "\n\t\tELSE NULL;"
         sql += "\n\tEND CASE;\n"
 
         sqlFooter = self.getTriggerFooter(
@@ -1098,6 +1101,7 @@ class PGInheritanceViewRecursive():
             else:
                 sql += "\n\t\t\tDELETE FROM {0} WHERE {1} = OLD.{1};".format(
                     definition['children'][child]['c_table'], definition['children'][child]['pkey'])
+        sql += "\n\t\tELSE NULL;"
         sql += "\n\tEND CASE;"
         if "custom_delete" in definition:
             sql += "\n\t{0};".format(definition['custom_delete'])
