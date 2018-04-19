@@ -45,7 +45,12 @@ class PGInheritanceViewRecursive():
                 'merge_view']['allow_type_change']
 
     def executeSql(self, sql):
-        self.cur.execute(sql)
+        try:
+            self.cur.execute(sql)
+        except psycopg2.ProgrammingError as pe:
+            print("Could not execute SQL:")
+            print(sql)
+            print("Error: {}".format(pe))
         self.conn.commit()
 
     def getColumns(self, element, childField):
@@ -124,7 +129,8 @@ class PGInheritanceViewRecursive():
                     sqlViews += self.sql_join_view(definition, child)
 
             sqlViews += self.sql_merge_view(definition)
-            self.executeSql(sqlViews)
+            if sqlViews:
+              self.executeSql(sqlViews)
 
             sqlTriggers = ''
             for child in definition['children']:
@@ -167,7 +173,8 @@ class PGInheritanceViewRecursive():
             self.trigStructMergeDeleteDict[definition['alias']] = sqlStruct
             sqlTriggers += sqlStruct.replace(self.REPLACE_TAG, sql)
 
-            self.executeSql(sqlTriggers)
+            if sqlTriggers:
+                self.executeSql(sqlTriggers)
 
             # We also need to store single triggers for root
             if 'isroot' in definition and definition['isroot']:
@@ -771,7 +778,7 @@ class PGInheritanceViewRecursive():
 
     def sql_merge_insert_trigger(self, definition, trig_header):
         if 'merge_view' not in definition:
-            return ''
+            return '', ''
 
         parent_columns = self.getColumns(definition, False)
 
@@ -913,7 +920,7 @@ class PGInheritanceViewRecursive():
 
     def sql_merge_update_trigger(self, definition, trig_header):
         if 'merge_view' not in definition:
-            return ''
+            return '', ''
 
         parent_columns = self.getColumns(definition, False)
 
@@ -1077,7 +1084,7 @@ class PGInheritanceViewRecursive():
 
     def sql_merge_delete_trigger(self, definition, trig_header):
         if 'merge_view' not in definition:
-            return ''
+            return '', ''
 
         functrigger = "{0}.ft_{1}_delete".format(
             definition['schema'], definition['merge_view']['name'])
