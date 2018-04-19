@@ -83,10 +83,12 @@ class PGInheritanceViewRecursive():
             return None
 
     def column_remap(self, element, column):
+        recol = None
         if 'remap' in element and column in element['remap']:
-            return element['remap'][column]
-        else:
-            return None
+            recol = element['remap'][column]
+        if 'prefix' in element:
+            recol = element['prefix'] + '_' + (recol or column)
+        return recol
 
     def join_view_name(self, definition, child, schema_qualified=True):
         name = '{0}.'.format(definition['schema']) if schema_qualified else ''
