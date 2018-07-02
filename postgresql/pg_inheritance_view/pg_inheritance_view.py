@@ -392,9 +392,9 @@ class PGInheritanceView():
         if 'merge_columns' in self.definition['merge_view']:
             for column_alias in self.definition['merge_view']['merge_columns']:
                 sql += "\n\t\t, CASE"
-                cast = None
+                cast = ''
                 if 'cast' in self.definition['merge_view']['merge_columns'][column_alias]:
-                    cast = self.definition['merge_view']['merge_columns'][column_alias]['cast']
+                    cast = '::{}'.format(self.definition['merge_view']['merge_columns'][column_alias]['cast'])
                 if 'fields' in self.definition['merge_view']['merge_columns'][column_alias]:
                     fields = self.definition['merge_view']['merge_columns'][column_alias]['fields']
                 else:
@@ -404,10 +404,10 @@ class PGInheritanceView():
                         table=table_alias,
                         pkey=self.definition['children'][table_alias]['pkey'],
                         col=fields[table_alias],
-                        cast='::{}'.format(cast) if cast else ''
+                        cast=cast
                     )
-                sql += "\n\t\t\tELSE NULL"
-                sql += "\n\t\tEND AS {0}".format(column_alias)
+                sql += "\n\t\t\tELSE NULL{}".format(cast)
+                sql += "\n\t\tEND AS {alias}".format(alias=column_alias)
 
         # children tables
         for child in self.definition['children']:
