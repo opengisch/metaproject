@@ -392,12 +392,19 @@ class PGInheritanceView():
         if 'merge_columns' in self.definition['merge_view']:
             for column_alias in self.definition['merge_view']['merge_columns']:
                 sql += "\n\t\t, CASE"
-                for table_alias in self.definition['merge_view']['merge_columns'][column_alias]:
-                    sql += "\n\t\t\tWHEN {0}.{1} IS NOT NULL THEN {0}.{2}".format(
-                        table_alias,
-                        self.definition['children'][table_alias]['pkey'],
-                        self.definition['merge_view'][
-                            'merge_columns'][column_alias][table_alias]
+                cast = None
+                if 'cast' in self.definition['merge_view']['merge_columns'][column_alias]:
+                    cast = self.definition['merge_view']['merge_columns'][column_alias]['cast']
+                if 'fields' in self.definition['merge_view']['merge_columns'][column_alias]:
+                    fields = self.definition['merge_view']['merge_columns'][column_alias]['fields']
+                else:
+                    fields = self.definition['merge_view']['merge_columns'][column_alias]
+                for table_alias in fields:
+                    sql += "\n\t\t\tWHEN {table}.{pkey} IS NOT NULL THEN {table}.{col}{cast}".format(
+                        table=table_alias,
+                        pkey=self.definition['children'][table_alias]['pkey'],
+                        col=fields[table_alias],
+                        cast='::{}'.format(cast) if cast else ''
                     )
                 sql += "\n\t\t\tELSE NULL"
                 sql += "\n\t\tEND AS {0}".format(column_alias)
@@ -408,10 +415,13 @@ class PGInheritanceView():
             # remove merged columns
             if 'merge_columns' in self.definition['merge_view']:
                 for column_alias in self.definition['merge_view']['merge_columns']:
-                    for table_alias in self.definition['merge_view']['merge_columns'][column_alias]:
+                    if 'fields' in self.definition['merge_view']['merge_columns'][column_alias]:
+                        fields = self.definition['merge_view']['merge_columns'][column_alias]['fields']
+                    else:
+                        fields = self.definition['merge_view']['merge_columns'][column_alias]
+                    for table_alias in fields:
                         if table_alias == child:
-                            child_columns.remove(self.definition['merge_view'][
-                                                 'merge_columns'][column_alias][child])
+                            child_columns.remove(fields[child])
             # add columns
             for col in child_columns:
                 col_alter_read = self.column_alter_read(
@@ -573,9 +583,13 @@ class PGInheritanceView():
                     # replace remapped column by merged column alias if exists
                     if 'merge_columns' in self.definition['merge_view']:
                         for column_alias in self.definition['merge_view']['merge_columns']:
-                            for table_alias in self.definition['merge_view']['merge_columns'][column_alias]:
+                            if 'fields' in self.definition['merge_view']['merge_columns'][column_alias]:
+                                fields = self.definition['merge_view']['merge_columns'][column_alias]['fields']
+                            else:
+                                fields = self.definition['merge_view']['merge_columns'][column_alias]
+                            for table_alias in fields:
                                 if table_alias == child:
-                                    if col_remap == self.definition['merge_view']['merge_columns'][column_alias][table_alias]:
+                                    if col_remap == fields[table_alias]:
                                         col_remap = column_alias
                 sql += "\n\t\t\t\t, "
                 if col_alter_write:
@@ -690,9 +704,13 @@ class PGInheritanceView():
                         # exists
                         if 'merge_columns' in self.definition['merge_view']:
                             for column_alias in self.definition['merge_view']['merge_columns']:
-                                for table_alias in self.definition['merge_view']['merge_columns'][column_alias]:
+                                if 'fields' in self.definition['merge_view']['merge_columns'][column_alias]:
+                                    fields = self.definition['merge_view']['merge_columns'][column_alias]['fields']
+                                else:
+                                    fields = self.definition['merge_view']['merge_columns'][column_alias]
+                                for table_alias in fields:
                                     if table_alias == child:
-                                        if col_remap == self.definition['merge_view']['merge_columns'][column_alias][table_alias]:
+                                        if col_remap == fields[table_alias]:
                                             col_remap = column_alias
                     sql += "\n\t\t\t\t\t\t, "
                     if col_alter_write:
@@ -736,9 +754,13 @@ class PGInheritanceView():
                         # exists
                         if 'merge_columns' in self.definition['merge_view']:
                             for column_alias in self.definition['merge_view']['merge_columns']:
-                                for table_alias in self.definition['merge_view']['merge_columns'][column_alias]:
+                                if 'fields' in self.definition['merge_view']['merge_columns'][column_alias]:
+                                    fields = self.definition['merge_view']['merge_columns'][column_alias]['fields']
+                                else:
+                                    fields = self.definition['merge_view']['merge_columns'][column_alias]
+                                for table_alias in fields:
                                     if table_alias == child:
-                                        if col_remap == self.definition['merge_view']['merge_columns'][column_alias][table_alias]:
+                                        if col_remap == fields[table_alias]:
                                             col_remap = column_alias
                     sql += "{0} = ".format(col)
                     if col_alter_write:
