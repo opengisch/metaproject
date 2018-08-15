@@ -771,6 +771,7 @@ class PGInheritanceView():
                 sql = sql[:-3]
                 sql += "WHERE {0} = OLD.{1};".format(self.definition['children'][child][
                                                      'pkey'], self.definition['pkey'])
+        sql += "\n\tELSE"
         sql += "\n\tEND CASE;\n"
 
         sql += "\n\tRETURN NEW;"
